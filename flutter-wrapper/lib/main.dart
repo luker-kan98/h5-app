@@ -32,8 +32,15 @@ class _WebViewPageState extends State<WebViewPage> {
   @override
   void initState() {
     super.initState();
+    debugPrint('H5_URL: $_h5Url');
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(NavigationDelegate(
+        onPageStarted: (url) => debugPrint('Page started: $url'),
+        onPageFinished: (url) => debugPrint('Page finished: $url'),
+        onWebResourceError: (error) => debugPrint('WebView error: ${error.errorCode} - ${error.description}'),
+        onHttpError: (error) => debugPrint('HTTP error: ${error.response?.statusCode}'),
+      ))
       ..loadRequest(Uri.parse(_h5Url));
   }
 
