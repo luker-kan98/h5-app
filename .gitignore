@@ -1,4 +1,5 @@
 # Python
+backend/venv/
 __pycache__/
 *.pyc
 *.pyo
@@ -35,3 +36,6 @@ dump.rdb
 # Electron build output
 electron-wrapper/dist/
 electron-wrapper/out/
+
+builds/
+.build-cache/

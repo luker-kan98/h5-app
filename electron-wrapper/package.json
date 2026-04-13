@@ -5,8 +5,8 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build:mac": "electron-builder --mac --x64",
-    "build:win": "electron-builder --win --x64"
+    "build:mac": "electron-builder --mac dir --x64 --publish never",
+    "build:win": "electron-builder --win --x64 --publish never"
   },
   "dependencies": {},
   "devDependencies": {
@@ -17,7 +17,7 @@
     "appId": "com.h5packager.app",
     "productName": "H5 App",
     "mac": {
-      "target": "dmg"
+      "target": "dir"
     },
     "win": {
       "target": "nsis"

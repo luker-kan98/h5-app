@@ -9,7 +9,13 @@ export function useBuild() {
     loading.value = true
     error.value = null
     try {
-      const { data } = await client.post('/build', { h5_url, platforms })
+      const formData = new FormData()
+      formData.append('h5_url', h5_url)
+      for (const platform of platforms) {
+        formData.append('platforms', platform)
+      }
+
+      const { data } = await client.post('/build', formData)
       return data.task_id
     } catch (e: any) {
       error.value = e.response?.data?.detail ?? 'Submission failed'

@@ -22,6 +22,57 @@ def test_run_succeeds_on_zero_exit():
 
 
 # ---------------------------------------------------------------------------
+# Electron env helper
+# ---------------------------------------------------------------------------
+
+def test_electron_env_uses_shared_electron_caches():
+    from app.tasks.build_task import _electron_env
+
+    with patch("app.tasks.build_task.os.makedirs") as mock_makedirs, \
+         patch("app.tasks.build_task._shared_cache_dir", side_effect=["/tmp/shared-electron", "/tmp/shared-builder"]):
+        env = _electron_env("/tmp/electron", "https://example.com")
+
+    assert env["H5_URL"] == "https://example.com"
+    assert env["npm_config_cache"] == "/tmp/electron/.cache/npm"
+    assert env["ELECTRON_CACHE"] == "/tmp/shared-electron"
+    assert env["ELECTRON_BUILDER_CACHE"] == "/tmp/shared-builder"
+    assert mock_makedirs.call_args_list == [
+        (("/tmp/electron/.cache",), {"exist_ok": True}),
+        (("/tmp/shared-electron",), {"exist_ok": True}),
+        (("/tmp/shared-builder",), {"exist_ok": True}),
+    ]
+
+
+def test_ensure_electron_dependencies_reuses_ready_cache():
+    from app.tasks.build_task import _ensure_electron_dependencies
+
+    with patch("app.tasks.build_task._electron_cache_dir", return_value="/tmp/cache"), \
+         patch("app.tasks.build_task._electron_cache_ready", return_value=True), \
+         patch("app.tasks.build_task._run") as mock_run:
+        result = _ensure_electron_dependencies()
+
+    assert result == "/tmp/cache"
+    mock_run.assert_not_called()
+
+
+def test_prepare_electron_workspace_links_cached_node_modules():
+    from app.tasks.build_task import _prepare_electron_workspace
+
+    with patch("app.tasks.build_task._ensure_electron_dependencies", return_value="/tmp/cache"), \
+         patch("app.tasks.build_task.shutil.copytree") as mock_copytree, \
+         patch("app.tasks.build_task.os.symlink") as mock_symlink:
+        result = _prepare_electron_workspace("/tmp/electron")
+
+    assert result == "/tmp/electron"
+    mock_copytree.assert_called_once()
+    mock_symlink.assert_called_once_with(
+        "/tmp/cache/node_modules",
+        "/tmp/electron/node_modules",
+        target_is_directory=True,
+    )
+
+
+# ---------------------------------------------------------------------------
 # _build_android
 # ---------------------------------------------------------------------------
 
@@ -112,8 +163,54 @@ def test_build_ios_returns_runner_app_path():
 
 
 # ---------------------------------------------------------------------------
+# Electron builds
+# ---------------------------------------------------------------------------
+
+def test_build_macos_uses_local_cache_env():
+    from app.tasks.build_task import _build_macos
+
+    with patch("app.tasks.build_task._run") as mock_run, \
+         patch("app.tasks.build_task.os.listdir", return_value=["H5 App.app"]), \
+         patch("app.tasks.build_task._electron_env", return_value={
+             "H5_URL": "https://example.com",
+             "npm_config_cache": "/tmp/electron/.cache/npm",
+             "ELECTRON_CACHE": "/tmp/shared-electron",
+             "ELECTRON_BUILDER_CACHE": "/tmp/shared-builder",
+         }):
+        result = _build_macos("https://example.com", "/tmp/flutter", "/tmp/electron")
+
+    assert result == "/tmp/electron/dist/mac/H5 App.app"
+    env = mock_run.call_args[1]["env"]
+    assert env["H5_URL"] == "https://example.com"
+    assert env["npm_config_cache"] == "/tmp/electron/.cache/npm"
+    assert env["ELECTRON_CACHE"] == "/tmp/shared-electron"
+    assert env["ELECTRON_BUILDER_CACHE"] == "/tmp/shared-builder"
+
+
+# ---------------------------------------------------------------------------
 # build_app task — status and cleanup
 # ---------------------------------------------------------------------------
+
+def test_build_app_prepares_electron_workspace_for_desktop_builds():
+    mock_db = MagicMock()
+
+    with patch("app.tasks.build_task._get_db", return_value=mock_db), \
+         patch("app.tasks.build_task._prepare_electron_workspace") as mock_prepare, \
+         patch("app.tasks.build_task._run") as mock_run, \
+         patch("app.tasks.build_task.os.makedirs"), \
+         patch("app.tasks.build_task.shutil.rmtree"), \
+         patch("app.tasks.build_task.PLATFORM_BUILDERS", {
+             "macos": MagicMock(side_effect=RuntimeError("skip"))
+         }), \
+         patch("app.tasks.build_task.artifact_dir", return_value="/tmp/fake-out"), \
+         patch("app.tasks.build_task.artifact_path", return_value="/tmp/fake-out/macos.zip"), \
+         patch("app.tasks.build_task.tempfile.mkdtemp", return_value="/tmp/fake-build-dir"):
+        from app.tasks.build_task import build_app
+        build_app.run(1, "https://example.com", ["macos"])
+
+    mock_prepare.assert_called_once_with("/tmp/fake-build-dir/electron")
+    mock_run.assert_not_called()
+
 
 def test_build_app_updates_status_to_running(db):
     """Task marks job as running before building."""

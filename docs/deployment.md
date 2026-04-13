@@ -1,5 +1,8 @@
 # 部署文档
 
+> 当前这台机器在 2026-04-13 的实际运行状态见：
+> [current-deployment-2026-04-13.md](/Users/ec2-user/h5-app/docs/current-deployment-2026-04-13.md)
+
 ## 架构概览
 
 ```

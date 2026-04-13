@@ -7,7 +7,7 @@ BUILDS_DIR = os.getenv("BUILDS_DIR", "./builds")
 PLATFORM_FILENAMES = {
     "android": "android.apk",
     "ios": "ios-unsigned.app.zip",
-    "macos": "macos.dmg",
+    "macos": "macos.zip",
     "windows": "windows-setup.exe",
 }
 
