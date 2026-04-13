@@ -8,8 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - `frontend/` — Vue 3 + Vite + TailwindCSS v4 + Pinia
 - `backend/` — FastAPI + Celery + SQLite
-- `flutter-wrapper/` — Flutter WebView template (Android/iOS)
-- `electron-wrapper/` — Electron template (macOS/Windows)
+- `flutter-wrapper/` — Flutter WebView template (Android/iOS/macOS/Windows)
 
 ## Commands
 
@@ -73,6 +72,7 @@ Redis must be running for Celery (used as broker and result backend).
 ### Build Requirements by Platform
 | Platform | Requirements |
 |----------|---|
-| Android | JDK + Android SDK + Gradle |
-| iOS | macOS + Xcode |
-| macOS/Windows | electron-builder |
+| Android | Flutter + JDK + Android SDK + Gradle |
+| iOS | Flutter + macOS + Xcode |
+| macOS | Flutter + macOS + Xcode |
+| Windows | Flutter + Visual Studio with C++ desktop workload |

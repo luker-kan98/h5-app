@@ -33,9 +33,5 @@ dump.rdb
 
 # Flutter build artifacts (excluded via flutter-wrapper/.gitignore)
 
-# Electron build output
-electron-wrapper/dist/
-electron-wrapper/out/
-
 builds/
 .build-cache/

@@ -1,10 +1,7 @@
-import hashlib
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
-import time
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -21,7 +18,6 @@ celery_app.config_from_object("celeryconfig")
 
 REPO_ROOT = os.getenv("REPO_ROOT", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
 FLUTTER_WRAPPER_SRC = os.path.join(REPO_ROOT, "flutter-wrapper")
-ELECTRON_WRAPPER_SRC = os.path.join(REPO_ROOT, "electron-wrapper")
 BUILDS_DIR = os.getenv("BUILDS_DIR", os.path.join(REPO_ROOT, "builds"))
 
 
@@ -49,110 +45,7 @@ def _run(cmd: list, cwd: str, env: dict = None) -> None:
         raise RuntimeError(f"Command {cmd[0]} failed:\n{detail_text}")
 
 
-def _shared_cache_dir(name: str) -> str:
-    home = os.path.expanduser("~")
-    if sys.platform == "darwin":
-        return os.path.join(home, "Library", "Caches", name)
-    return os.path.join(home, ".cache", name)
-
-
-def _electron_env(ele_dir: str, h5_url: Optional[str] = None) -> dict:
-    npm_cache_root = os.path.join(ele_dir, ".cache")
-    os.makedirs(npm_cache_root, exist_ok=True)
-
-    electron_cache = os.environ.get("ELECTRON_CACHE", _shared_cache_dir("electron"))
-    electron_builder_cache = os.environ.get("ELECTRON_BUILDER_CACHE", _shared_cache_dir("electron-builder"))
-    os.makedirs(electron_cache, exist_ok=True)
-    os.makedirs(electron_builder_cache, exist_ok=True)
-
-    env = {
-        **os.environ,
-        "npm_config_cache": os.path.join(npm_cache_root, "npm"),
-        "ELECTRON_CACHE": electron_cache,
-        "ELECTRON_BUILDER_CACHE": electron_builder_cache,
-    }
-    if h5_url:
-        env["H5_URL"] = h5_url
-    return env
-
-
-def _electron_cache_key() -> str:
-    digest = hashlib.sha256()
-    for filename in ("package.json", "package-lock.json"):
-        with open(os.path.join(ELECTRON_WRAPPER_SRC, filename), "rb") as f:
-            digest.update(f.read())
-    return digest.hexdigest()[:16]
-
-
-def _electron_cache_dir() -> str:
-    return os.path.join(REPO_ROOT, ".build-cache", "electron", _electron_cache_key())
-
-
-def _electron_cache_ready(cache_dir: str) -> bool:
-    return os.path.isfile(os.path.join(cache_dir, ".deps-ready")) and os.path.isdir(
-        os.path.join(cache_dir, "node_modules")
-    )
-
-
-def _ignore_electron_artifacts(_src: str, names: list[str]) -> list[str]:
-    ignored = {"node_modules", "dist", ".cache"}
-    return [name for name in names if name in ignored]
-
-
-def _acquire_dir_lock(lock_dir: str, timeout_seconds: int = 300) -> None:
-    deadline = time.time() + timeout_seconds
-    while True:
-        try:
-            os.mkdir(lock_dir)
-            return
-        except FileExistsError:
-            if time.time() >= deadline:
-                raise RuntimeError(f"Timed out waiting for build lock: {lock_dir}")
-            time.sleep(0.2)
-
-
-def _ensure_electron_dependencies() -> str:
-    cache_dir = _electron_cache_dir()
-    if _electron_cache_ready(cache_dir):
-        return cache_dir
-
-    os.makedirs(os.path.dirname(cache_dir), exist_ok=True)
-    lock_dir = f"{cache_dir}.lock"
-    _acquire_dir_lock(lock_dir)
-
-    try:
-        if _electron_cache_ready(cache_dir):
-            return cache_dir
-
-        staging_dir = f"{cache_dir}.tmp-{os.getpid()}"
-        shutil.rmtree(staging_dir, ignore_errors=True)
-        shutil.copytree(ELECTRON_WRAPPER_SRC, staging_dir, ignore=_ignore_electron_artifacts)
-        _run(["npm", "install"], cwd=staging_dir, env=_electron_env(staging_dir))
-        with open(os.path.join(staging_dir, ".deps-ready"), "w", encoding="utf-8") as f:
-            f.write(_electron_cache_key())
-
-        shutil.rmtree(cache_dir, ignore_errors=True)
-        os.replace(staging_dir, cache_dir)
-        return cache_dir
-    finally:
-        shutil.rmtree(lock_dir, ignore_errors=True)
-
-
-def _prepare_electron_workspace(ele_tmp: str) -> str:
-    cache_dir = _ensure_electron_dependencies()
-    shutil.copytree(ELECTRON_WRAPPER_SRC, ele_tmp, ignore=_ignore_electron_artifacts)
-
-    cached_node_modules = os.path.join(cache_dir, "node_modules")
-    workspace_node_modules = os.path.join(ele_tmp, "node_modules")
-    try:
-        os.symlink(cached_node_modules, workspace_node_modules, target_is_directory=True)
-    except OSError:
-        shutil.copytree(cached_node_modules, workspace_node_modules, symlinks=True)
-
-    return ele_tmp
-
-
-def _build_android(h5_url: str, flutter_dir: str, _ele_dir: str, keystore_params: Optional[dict] = None) -> str:
+def _build_android(h5_url: str, flutter_dir: str, keystore_params: Optional[dict] = None) -> str:
     env = {**os.environ}
     if keystore_params:
         env["KEYSTORE_PATH"] = keystore_params["path"]
@@ -167,34 +60,154 @@ def _build_android(h5_url: str, flutter_dir: str, _ele_dir: str, keystore_params
     return os.path.join(flutter_dir, "build/app/outputs/flutter-apk/app-release.apk")
 
 
-def _build_ios(h5_url: str, flutter_dir: str, _ele_dir: str) -> str:
+def _build_ios(h5_url: str, flutter_dir: str) -> str:
     _run(
         ["flutter", "build", "ios", "--release", "--no-codesign",
          f"--dart-define=H5_URL={h5_url}"],
         cwd=flutter_dir,
     )
-    # Scheme name is fixed as "Runner" (Flutter default — do not rename in template)
     return os.path.join(flutter_dir, "build/ios/iphoneos/Runner.app")
 
 
-def _build_macos(h5_url: str, _flutter_dir: str, ele_dir: str) -> str:
-    env = _electron_env(ele_dir, h5_url)
-    _run(["npm", "run", "build:mac"], cwd=ele_dir, env=env)
-    app_dir = os.path.join(ele_dir, "dist", "mac")
+def _find_signing_identity() -> Optional[str]:
+    """Auto-detect a Developer ID Application identity from the local Keychain."""
+    result = subprocess.run(
+        ["security", "find-identity", "-v", "-p", "codesigning"],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        return None
+    for line in result.stdout.splitlines():
+        # Prefer "Developer ID Application" for distribution outside App Store
+        if "Developer ID Application" in line:
+            # Line format: 1) HASH "Developer ID Application: Name (TeamID)"
+            start = line.find('"')
+            end = line.rfind('"')
+            if start != -1 and end > start:
+                return line[start + 1:end]
+    # Fallback: use "Apple Development" for local/dev signing
+    for line in result.stdout.splitlines():
+        if "Apple Development" in line:
+            start = line.find('"')
+            end = line.rfind('"')
+            if start != -1 and end > start:
+                return line[start + 1:end]
+    return None
+
+
+def _codesign_app(app_path: str, signing_identity: str) -> None:
+    """Recursively codesign a .app bundle with the given identity."""
+    _run(
+        ["codesign", "--deep", "--force", "--options", "runtime",
+         "--sign", signing_identity, app_path],
+        cwd=os.path.dirname(app_path),
+    )
+    _run(
+        ["codesign", "--verify", "--deep", "--strict", app_path],
+        cwd=os.path.dirname(app_path),
+    )
+
+
+def _create_dmg(app_path: str, output_dmg: str, app_name: str) -> str:
+    """Create a DMG from a .app bundle using hdiutil."""
+    staging = app_path + "-dmg-staging"
+    os.makedirs(staging, exist_ok=True)
+    dest_app = os.path.join(staging, os.path.basename(app_path))
+    if os.path.exists(dest_app):
+        shutil.rmtree(dest_app)
+    shutil.copytree(app_path, dest_app)
+    apps_link = os.path.join(staging, "Applications")
+    if not os.path.exists(apps_link):
+        os.symlink("/Applications", apps_link)
+    _run(
+        ["hdiutil", "create", "-volname", app_name, "-srcfolder", staging,
+         "-ov", "-format", "UDZO", output_dmg],
+        cwd=os.path.dirname(output_dmg),
+    )
+    shutil.rmtree(staging, ignore_errors=True)
+    return output_dmg
+
+
+def _build_macos(h5_url: str, flutter_dir: str) -> str:
+    _run(
+        ["flutter", "build", "macos", "--release",
+         f"--dart-define=H5_URL={h5_url}"],
+        cwd=flutter_dir,
+    )
+    app_dir = os.path.join(flutter_dir, "build", "macos", "Build", "Products", "Release")
     app_bundle = next((f for f in os.listdir(app_dir) if f.endswith(".app")), None)
     if not app_bundle:
         raise RuntimeError("macOS build produced no .app bundle")
-    return os.path.join(app_dir, app_bundle)
+    app_path = os.path.join(app_dir, app_bundle)
+
+    # Auto-detect and codesign with local Keychain identity
+    identity = _find_signing_identity()
+    if identity:
+        _codesign_app(app_path, identity)
+
+    # Package as DMG
+    app_name = app_bundle.replace(".app", "")
+    dmg_path = os.path.join(app_dir, f"{app_name}.dmg")
+    _create_dmg(app_path, dmg_path, app_name)
+    return dmg_path
 
 
-def _build_windows(h5_url: str, _flutter_dir: str, ele_dir: str) -> str:
-    env = _electron_env(ele_dir, h5_url)
-    _run(["npm", "run", "build:win"], cwd=ele_dir, env=env)
-    dist = os.path.join(ele_dir, "dist")
-    exe = next((f for f in os.listdir(dist) if f.endswith(".exe")), None)
-    if not exe:
+def _create_nsis_script(release_dir: str, exe_name: str, output_installer: str, app_name: str) -> str:
+    """Generate an NSIS script and return its path."""
+    nsis_script = os.path.join(release_dir, "installer.nsi")
+    script_content = f"""!include "MUI2.nsh"
+
+Name "{app_name}"
+OutFile "{output_installer}"
+InstallDir "$PROGRAMFILES\\{app_name}"
+RequestExecutionLevel admin
+
+!insertmacro MUI_PAGE_DIRECTORY
+!insertmacro MUI_PAGE_INSTFILES
+!insertmacro MUI_LANGUAGE "English"
+
+Section "Install"
+  SetOutPath "$INSTDIR"
+  File /r "{release_dir}\\*.*"
+  CreateShortcut "$DESKTOP\\{app_name}.lnk" "$INSTDIR\\{exe_name}"
+  CreateShortcut "$SMPROGRAMS\\{app_name}.lnk" "$INSTDIR\\{exe_name}"
+  WriteUninstaller "$INSTDIR\\uninstall.exe"
+SectionEnd
+
+Section "Uninstall"
+  RMDir /r "$INSTDIR"
+  Delete "$DESKTOP\\{app_name}.lnk"
+  Delete "$SMPROGRAMS\\{app_name}.lnk"
+SectionEnd
+"""
+    with open(nsis_script, "w", encoding="utf-8") as f:
+        f.write(script_content)
+    return nsis_script
+
+
+def _build_windows(h5_url: str, flutter_dir: str) -> str:
+    _run(
+        ["flutter", "build", "windows", "--release",
+         f"--dart-define=H5_URL={h5_url}"],
+        cwd=flutter_dir,
+    )
+    release_dir = os.path.join(flutter_dir, "build", "windows", "x64", "runner", "Release")
+    if not os.path.isdir(release_dir):
+        raise RuntimeError("Windows build produced no Release directory")
+
+    # Find the main exe
+    exe_name = next((f for f in os.listdir(release_dir) if f.endswith(".exe")), None)
+    if not exe_name:
         raise RuntimeError("Windows build produced no .exe file")
-    return os.path.join(dist, exe)
+
+    app_name = exe_name.replace(".exe", "")
+    output_installer = os.path.join(flutter_dir, "build", "windows", f"{app_name}-setup.exe")
+    nsis_script = _create_nsis_script(release_dir, exe_name, output_installer, app_name)
+    _run(["makensis", nsis_script], cwd=release_dir)
+
+    if not os.path.isfile(output_installer):
+        raise RuntimeError("NSIS failed to produce installer exe")
+    return output_installer
 
 
 PLATFORM_BUILDERS = {
@@ -209,7 +222,8 @@ PLATFORM_ERROR_ATTRS = {p: f"{p}_error" for p in PLATFORM_BUILDERS}
 
 
 @celery_app.task(name="build_app", bind=True)
-def build_app(self, job_id: int, h5_url: str, platforms: list, keystore_params: Optional[dict] = None):
+def build_app(self, job_id: int, h5_url: str, platforms: list,
+              keystore_params: Optional[dict] = None):
     db = _get_db()
     tmp_dir = tempfile.mkdtemp(prefix=f"build-{self.request.id}-")
 
@@ -217,23 +231,14 @@ def build_app(self, job_id: int, h5_url: str, platforms: list, keystore_params: 
         _update_job(db, job_id, status="running")
 
         flutter_tmp = os.path.join(tmp_dir, "flutter")
-        ele_tmp = os.path.join(tmp_dir, "electron")
-        mobile_platforms = {"android", "ios"}
-        desktop_platforms = {"macos", "windows"}
-        needs_flutter = any(platform in mobile_platforms for platform in platforms)
-        needs_electron = any(platform in desktop_platforms for platform in platforms)
 
         def ignore_flutter_artifacts(src, names):
             return [n for n in names if n in {
                 ".dart_tool", "build", ".flutter-plugins", ".flutter-plugins-dependencies"
             }]
 
-        if needs_flutter:
-            shutil.copytree(FLUTTER_WRAPPER_SRC, flutter_tmp, ignore=ignore_flutter_artifacts)
-            _run(["flutter", "pub", "get"], cwd=flutter_tmp)
-
-        if needs_electron:
-            _prepare_electron_workspace(ele_tmp)
+        shutil.copytree(FLUTTER_WRAPPER_SRC, flutter_tmp, ignore=ignore_flutter_artifacts)
+        _run(["flutter", "pub", "get"], cwd=flutter_tmp)
 
         # Output directory for this task's artifacts
         out_dir = artifact_dir(self.request.id)
@@ -244,12 +249,12 @@ def build_app(self, job_id: int, h5_url: str, platforms: list, keystore_params: 
             try:
                 builder = PLATFORM_BUILDERS[platform]
                 if platform == "android":
-                    src_path = builder(h5_url, flutter_tmp, ele_tmp, keystore_params)
+                    src_path = builder(h5_url, flutter_tmp, keystore_params)
                 else:
-                    src_path = builder(h5_url, flutter_tmp, ele_tmp)
+                    src_path = builder(h5_url, flutter_tmp)
                 dest = artifact_path(self.request.id, platform)
                 if os.path.isdir(src_path):
-                    # zip directory artifacts (e.g. .app bundles)
+                    # zip directory artifacts (e.g. .app bundles, windows release dir)
                     base = dest.replace(".zip", "")
                     shutil.make_archive(base, "zip", src_path)
                     dest = base + ".zip" if not dest.endswith(".zip") else dest

@@ -22,7 +22,6 @@ services:
     volumes:
       - ./builds:/app/builds
       - ./flutter-wrapper:/workspace/flutter-wrapper
-      - ./electron-wrapper:/workspace/electron-wrapper
       - db-data:/data
     depends_on:
       - redis
@@ -41,7 +40,6 @@ services:
     volumes:
       - ./builds:/app/builds
       - ./flutter-wrapper:/workspace/flutter-wrapper
-      - ./electron-wrapper:/workspace/electron-wrapper
       - db-data:/data
     depends_on:
       - redis
