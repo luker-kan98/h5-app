@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+.cache/
+
+# Build artifacts
+backend/builds/
+/tmp/build-*/
+
+# DB
+*.db
+*.db-shm
+*.db-wal
+*.sqlite3
+
+# Env
+.env
+.env.local
+
+# Redis dump
+dump.rdb
+
+# Certificates/keys
+*.pem
+
+# Flutter build artifacts (excluded via flutter-wrapper/.gitignore)
+
+# Electron build output
+electron-wrapper/dist/
+electron-wrapper/out/
