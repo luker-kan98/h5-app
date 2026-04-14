@@ -112,76 +112,39 @@ def test_build_ios_returns_runner_app_path():
 
 
 # ---------------------------------------------------------------------------
-# _build_macos
+# _build_macos (Electron)
 # ---------------------------------------------------------------------------
 
-def test_build_macos_produces_dmg():
+def test_build_macos_calls_electron_builder():
     from app.tasks.build_task import _build_macos
 
     with patch("app.tasks.build_task._run") as mock_run, \
-         patch("app.tasks.build_task.os.listdir", return_value=["h5_app.app"]), \
-         patch("app.tasks.build_task._find_signing_identity", return_value=None), \
-         patch("app.tasks.build_task._create_dmg", return_value="/tmp/flutter/build/macos/Build/Products/Release/h5_app.dmg") as mock_dmg:
-        result = _build_macos("https://example.com", "/tmp/flutter")
+         patch("app.tasks.build_task.os.listdir", return_value=["H5 App-1.0.0.dmg"]):
+        result = _build_macos("https://example.com", "/tmp/electron")
 
-    cmd = mock_run.call_args_list[0][0][0]
-    assert cmd[0] == "flutter"
-    assert "macos" in cmd
-    assert any("H5_URL=https://example.com" in arg for arg in cmd)
-    mock_dmg.assert_called_once()
+    mock_run.assert_called_once()
+    cmd = mock_run.call_args[0][0]
+    assert cmd == ["npm", "run", "build:mac"]
+    assert mock_run.call_args[1]["cwd"] == "/tmp/electron"
     assert result.endswith(".dmg")
 
 
-def test_build_macos_codesigns_with_local_identity():
-    from app.tasks.build_task import _build_macos
-
-    with patch("app.tasks.build_task._run") as mock_run, \
-         patch("app.tasks.build_task.os.listdir", return_value=["h5_app.app"]), \
-         patch("app.tasks.build_task._find_signing_identity", return_value="Developer ID Application: Test (XXXXXXXXXX)"), \
-         patch("app.tasks.build_task._create_dmg", return_value="/tmp/flutter/build/macos/Build/Products/Release/h5_app.dmg"):
-        _build_macos("https://example.com", "/tmp/flutter")
-
-    # flutter build + codesign + codesign --verify = 3 _run calls
-    assert mock_run.call_count == 3
-    codesign_cmd = mock_run.call_args_list[1][0][0]
-    assert codesign_cmd[0] == "codesign"
-    assert "Developer ID Application: Test (XXXXXXXXXX)" in codesign_cmd
-
-
-def test_build_macos_skips_codesign_when_no_identity():
-    from app.tasks.build_task import _build_macos
-
-    with patch("app.tasks.build_task._run") as mock_run, \
-         patch("app.tasks.build_task.os.listdir", return_value=["h5_app.app"]), \
-         patch("app.tasks.build_task._find_signing_identity", return_value=None), \
-         patch("app.tasks.build_task._create_dmg", return_value="/tmp/flutter/build/macos/Build/Products/Release/h5_app.dmg"):
-        _build_macos("https://example.com", "/tmp/flutter")
-
-    assert mock_run.call_count == 1
-
-
 # ---------------------------------------------------------------------------
-# _build_windows
+# _build_windows (Electron)
 # ---------------------------------------------------------------------------
 
-def test_build_windows_produces_installer_exe():
+def test_build_windows_calls_electron_builder():
     from app.tasks.build_task import _build_windows
 
     with patch("app.tasks.build_task._run") as mock_run, \
-         patch("app.tasks.build_task.os.listdir", return_value=["h5_app.exe", "flutter_windows.dll"]), \
-         patch("app.tasks.build_task.os.path.isdir", return_value=True), \
-         patch("app.tasks.build_task.os.path.isfile", return_value=True), \
-         patch("builtins.open", MagicMock()):
-        result = _build_windows("https://example.com", "/tmp/flutter")
+         patch("app.tasks.build_task.os.listdir", return_value=["H5 App Setup 1.0.0.exe"]):
+        result = _build_windows("https://example.com", "/tmp/electron")
 
-    # First call is flutter build, second is makensis
-    assert mock_run.call_count == 2
-    flutter_cmd = mock_run.call_args_list[0][0][0]
-    assert flutter_cmd[0] == "flutter"
-    assert "windows" in flutter_cmd
-    nsis_cmd = mock_run.call_args_list[1][0][0]
-    assert nsis_cmd[0] == "makensis"
-    assert result.endswith("-setup.exe")
+    mock_run.assert_called_once()
+    cmd = mock_run.call_args[0][0]
+    assert cmd == ["npm", "run", "build:win"]
+    assert mock_run.call_args[1]["cwd"] == "/tmp/electron"
+    assert result.endswith(".exe")
 
 
 # ---------------------------------------------------------------------------

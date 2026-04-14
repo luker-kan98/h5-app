@@ -18,6 +18,7 @@ celery_app.config_from_object("celeryconfig")
 
 REPO_ROOT = os.getenv("REPO_ROOT", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
 FLUTTER_WRAPPER_SRC = os.path.join(REPO_ROOT, "flutter-wrapper")
+ELECTRON_WRAPPER_SRC = os.path.join(REPO_ROOT, "electron-wrapper")
 BUILDS_DIR = os.getenv("BUILDS_DIR", os.path.join(REPO_ROOT, "builds"))
 
 
@@ -69,146 +70,42 @@ def _build_ios(h5_url: str, flutter_dir: str) -> str:
     return os.path.join(flutter_dir, "build/ios/iphoneos/Runner.app")
 
 
-def _find_signing_identity() -> Optional[str]:
-    """Auto-detect a Developer ID Application identity from the local Keychain."""
-    result = subprocess.run(
-        ["security", "find-identity", "-v", "-p", "codesigning"],
-        capture_output=True, text=True,
-    )
-    if result.returncode != 0:
-        return None
-    for line in result.stdout.splitlines():
-        # Prefer "Developer ID Application" for distribution outside App Store
-        if "Developer ID Application" in line:
-            # Line format: 1) HASH "Developer ID Application: Name (TeamID)"
-            start = line.find('"')
-            end = line.rfind('"')
-            if start != -1 and end > start:
-                return line[start + 1:end]
-    # Fallback: use "Apple Development" for local/dev signing
-    for line in result.stdout.splitlines():
-        if "Apple Development" in line:
-            start = line.find('"')
-            end = line.rfind('"')
-            if start != -1 and end > start:
-                return line[start + 1:end]
-    return None
+def _prepare_electron(h5_url: str, tmp_dir: str) -> str:
+    """Copy electron-wrapper to tmp_dir, inject H5_URL, run npm install. Returns the working dir."""
+    electron_dir = os.path.join(tmp_dir, "electron")
+    shutil.copytree(ELECTRON_WRAPPER_SRC, electron_dir, ignore=shutil.ignore_patterns("node_modules"))
+    # Inject H5_URL into main.js
+    main_js = os.path.join(electron_dir, "main.js")
+    with open(main_js, "r", encoding="utf-8") as f:
+        content = f.read()
+    content = content.replace("__H5_URL__", h5_url)
+    with open(main_js, "w", encoding="utf-8") as f:
+        f.write(content)
+    _run(["npm", "install"], cwd=electron_dir)
+    return electron_dir
 
 
-def _codesign_app(app_path: str, signing_identity: str) -> None:
-    """Recursively codesign a .app bundle with the given identity."""
-    _run(
-        ["codesign", "--deep", "--force", "--options", "runtime",
-         "--sign", signing_identity, app_path],
-        cwd=os.path.dirname(app_path),
-    )
-    _run(
-        ["codesign", "--verify", "--deep", "--strict", app_path],
-        cwd=os.path.dirname(app_path),
-    )
+def _build_macos(h5_url: str, electron_dir: str) -> str:
+    _run(["npm", "run", "build:mac"], cwd=electron_dir)
+    dist_dir = os.path.join(electron_dir, "dist")
+    # electron-builder produces the DMG directly in dist/
+    dmg = next((f for f in os.listdir(dist_dir) if f.endswith(".dmg")), None)
+    if not dmg:
+        raise RuntimeError("electron-builder produced no .dmg file")
+    return os.path.join(dist_dir, dmg)
 
 
-def _create_dmg(app_path: str, output_dmg: str, app_name: str) -> str:
-    """Create a DMG from a .app bundle using hdiutil."""
-    staging = app_path + "-dmg-staging"
-    os.makedirs(staging, exist_ok=True)
-    dest_app = os.path.join(staging, os.path.basename(app_path))
-    if os.path.exists(dest_app):
-        shutil.rmtree(dest_app)
-    shutil.copytree(app_path, dest_app)
-    apps_link = os.path.join(staging, "Applications")
-    if not os.path.exists(apps_link):
-        os.symlink("/Applications", apps_link)
-    _run(
-        ["hdiutil", "create", "-volname", app_name, "-srcfolder", staging,
-         "-ov", "-format", "UDZO", output_dmg],
-        cwd=os.path.dirname(output_dmg),
-    )
-    shutil.rmtree(staging, ignore_errors=True)
-    return output_dmg
+def _build_windows(h5_url: str, electron_dir: str) -> str:
+    _run(["npm", "run", "build:win"], cwd=electron_dir)
+    dist_dir = os.path.join(electron_dir, "dist")
+    exe = next((f for f in os.listdir(dist_dir) if f.endswith(".exe")), None)
+    if not exe:
+        raise RuntimeError("electron-builder produced no .exe installer")
+    return os.path.join(dist_dir, exe)
 
 
-def _build_macos(h5_url: str, flutter_dir: str) -> str:
-    _run(
-        ["flutter", "build", "macos", "--release",
-         f"--dart-define=H5_URL={h5_url}"],
-        cwd=flutter_dir,
-    )
-    app_dir = os.path.join(flutter_dir, "build", "macos", "Build", "Products", "Release")
-    app_bundle = next((f for f in os.listdir(app_dir) if f.endswith(".app")), None)
-    if not app_bundle:
-        raise RuntimeError("macOS build produced no .app bundle")
-    app_path = os.path.join(app_dir, app_bundle)
-
-    # Auto-detect and codesign with local Keychain identity
-    identity = _find_signing_identity()
-    if identity:
-        _codesign_app(app_path, identity)
-
-    # Package as DMG
-    app_name = app_bundle.replace(".app", "")
-    dmg_path = os.path.join(app_dir, f"{app_name}.dmg")
-    _create_dmg(app_path, dmg_path, app_name)
-    return dmg_path
-
-
-def _create_nsis_script(release_dir: str, exe_name: str, output_installer: str, app_name: str) -> str:
-    """Generate an NSIS script and return its path."""
-    nsis_script = os.path.join(release_dir, "installer.nsi")
-    script_content = f"""!include "MUI2.nsh"
-
-Name "{app_name}"
-OutFile "{output_installer}"
-InstallDir "$PROGRAMFILES\\{app_name}"
-RequestExecutionLevel admin
-
-!insertmacro MUI_PAGE_DIRECTORY
-!insertmacro MUI_PAGE_INSTFILES
-!insertmacro MUI_LANGUAGE "English"
-
-Section "Install"
-  SetOutPath "$INSTDIR"
-  File /r "{release_dir}\\*.*"
-  CreateShortcut "$DESKTOP\\{app_name}.lnk" "$INSTDIR\\{exe_name}"
-  CreateShortcut "$SMPROGRAMS\\{app_name}.lnk" "$INSTDIR\\{exe_name}"
-  WriteUninstaller "$INSTDIR\\uninstall.exe"
-SectionEnd
-
-Section "Uninstall"
-  RMDir /r "$INSTDIR"
-  Delete "$DESKTOP\\{app_name}.lnk"
-  Delete "$SMPROGRAMS\\{app_name}.lnk"
-SectionEnd
-"""
-    with open(nsis_script, "w", encoding="utf-8") as f:
-        f.write(script_content)
-    return nsis_script
-
-
-def _build_windows(h5_url: str, flutter_dir: str) -> str:
-    _run(
-        ["flutter", "build", "windows", "--release",
-         f"--dart-define=H5_URL={h5_url}"],
-        cwd=flutter_dir,
-    )
-    release_dir = os.path.join(flutter_dir, "build", "windows", "x64", "runner", "Release")
-    if not os.path.isdir(release_dir):
-        raise RuntimeError("Windows build produced no Release directory")
-
-    # Find the main exe
-    exe_name = next((f for f in os.listdir(release_dir) if f.endswith(".exe")), None)
-    if not exe_name:
-        raise RuntimeError("Windows build produced no .exe file")
-
-    app_name = exe_name.replace(".exe", "")
-    output_installer = os.path.join(flutter_dir, "build", "windows", f"{app_name}-setup.exe")
-    nsis_script = _create_nsis_script(release_dir, exe_name, output_installer, app_name)
-    _run(["makensis", nsis_script], cwd=release_dir)
-
-    if not os.path.isfile(output_installer):
-        raise RuntimeError("NSIS failed to produce installer exe")
-    return output_installer
-
+FLUTTER_PLATFORMS = {"android", "ios"}
+ELECTRON_PLATFORMS = {"macos", "windows"}
 
 PLATFORM_BUILDERS = {
     "android": _build_android,
@@ -230,15 +127,27 @@ def build_app(self, job_id: int, h5_url: str, platforms: list,
     try:
         _update_job(db, job_id, status="running")
 
-        flutter_tmp = os.path.join(tmp_dir, "flutter")
+        need_flutter = bool(set(platforms) & FLUTTER_PLATFORMS)
+        need_electron = bool(set(platforms) & ELECTRON_PLATFORMS)
 
-        def ignore_flutter_artifacts(src, names):
-            return [n for n in names if n in {
-                ".dart_tool", "build", ".flutter-plugins", ".flutter-plugins-dependencies"
-            }]
+        flutter_tmp = None
+        electron_tmp = None
 
-        shutil.copytree(FLUTTER_WRAPPER_SRC, flutter_tmp, ignore=ignore_flutter_artifacts)
-        _run(["flutter", "pub", "get"], cwd=flutter_tmp)
+        # Prepare Flutter workspace (Android / iOS)
+        if need_flutter:
+            flutter_tmp = os.path.join(tmp_dir, "flutter")
+
+            def ignore_flutter_artifacts(src, names):
+                return [n for n in names if n in {
+                    ".dart_tool", "build", ".flutter-plugins", ".flutter-plugins-dependencies"
+                }]
+
+            shutil.copytree(FLUTTER_WRAPPER_SRC, flutter_tmp, ignore=ignore_flutter_artifacts)
+            _run(["flutter", "pub", "get"], cwd=flutter_tmp)
+
+        # Prepare Electron workspace (macOS / Windows)
+        if need_electron:
+            electron_tmp = _prepare_electron(h5_url, tmp_dir)
 
         # Output directory for this task's artifacts
         out_dir = artifact_dir(self.request.id)
@@ -250,11 +159,12 @@ def build_app(self, job_id: int, h5_url: str, platforms: list,
                 builder = PLATFORM_BUILDERS[platform]
                 if platform == "android":
                     src_path = builder(h5_url, flutter_tmp, keystore_params)
-                else:
+                elif platform == "ios":
                     src_path = builder(h5_url, flutter_tmp)
+                else:
+                    src_path = builder(h5_url, electron_tmp)
                 dest = artifact_path(self.request.id, platform)
                 if os.path.isdir(src_path):
-                    # zip directory artifacts (e.g. .app bundles, windows release dir)
                     base = dest.replace(".zip", "")
                     shutil.make_archive(base, "zip", src_path)
                     dest = base + ".zip" if not dest.endswith(".zip") else dest
