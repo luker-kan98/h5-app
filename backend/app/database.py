@@ -2,7 +2,10 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./h5app.db")
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql+psycopg://h5app:h5app@127.0.0.1:5432/h5app",
+)
 
 _is_sqlite = DATABASE_URL.startswith("sqlite")
 engine = create_engine(

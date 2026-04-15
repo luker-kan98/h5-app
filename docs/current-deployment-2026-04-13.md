@@ -43,8 +43,9 @@ Browser
 - 后端代码目录：`/Users/ec2-user/h5-app/backend`
 - API 服务：FastAPI + Uvicorn
 - Worker：Celery
+- 调度器：单机 scheduler daemon
 - Broker / Result Backend：Redis `127.0.0.1:6379/0`
-- 数据库：SQLite，文件位于 `backend/h5app.db`
+- 数据库：PostgreSQL，默认连接 `postgresql+psycopg://h5app:h5app@127.0.0.1:5432/h5app`
 - 构建产物目录：`/Users/ec2-user/h5-app/builds`
 
 后端以 macOS `launchd` 的 LaunchAgent 方式常驻运行，退出当前会话后仍会继续运行。
@@ -53,19 +54,22 @@ Browser
 
 - Backend plist：`/Users/ec2-user/h5-app/backend/launchd/com.h5app.backend.plist`
 - Celery plist：`/Users/ec2-user/h5-app/backend/launchd/com.h5app.celery.plist`
+- Scheduler plist：`/Users/ec2-user/h5-app/backend/launchd/com.h5app.scheduler.plist`
 - Backend label：`com.h5app.backend`
 - Celery label：`com.h5app.celery`
+- Scheduler label：`com.h5app.scheduler`
 
 ### 启动脚本
 
 - Backend 脚本：`/Users/ec2-user/h5-app/backend/scripts/start_backend.sh`
 - Celery 脚本：`/Users/ec2-user/h5-app/backend/scripts/start_celery.sh`
+- Scheduler 脚本：`/Users/ec2-user/h5-app/backend/scripts/start_scheduler.sh`
 
-脚本中固定了当前部署依赖的环境变量：
+脚本中的默认环境变量：
 
 ```bash
 SECRET_KEY=dev-local-2026-04-10
-DATABASE_URL=sqlite:///./h5app.db
+DATABASE_URL=postgresql+psycopg://h5app:h5app@127.0.0.1:5432/h5app
 CELERY_BROKER_URL=redis://127.0.0.1:6379/0
 CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/0
 BUILDS_DIR=/Users/ec2-user/h5-app/builds
@@ -80,6 +84,7 @@ ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
 - Nginx error log：`/tmp/h5-app-nginx-error.log`
 - Backend log：`/tmp/h5-app-backend.log`
 - Celery log：`/tmp/h5-app-celery.log`
+- Scheduler log：`/tmp/h5-app-scheduler.log`
 
 ## 当前状态核验
 
@@ -89,8 +94,10 @@ ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
 - `http://127.0.0.1:8000/docs` 返回 `200 OK`
 - `launchctl print gui/501/com.h5app.backend` 显示 `state = running`
 - `launchctl print gui/501/com.h5app.celery` 显示 `state = running`
+- `launchctl print gui/501/com.h5app.scheduler` 显示 `state = running`
 - `redis-cli -p 6379 ping` 返回 `PONG`
 - Celery 日志显示 worker `ready`
+- Scheduler 日志持续输出调度周期结果
 
 ## 运维命令
 
@@ -101,8 +108,10 @@ curl -I http://127.0.0.1:80/
 curl -I http://127.0.0.1:8000/docs
 launchctl print gui/$(id -u)/com.h5app.backend
 launchctl print gui/$(id -u)/com.h5app.celery
+launchctl print gui/$(id -u)/com.h5app.scheduler
 tail -n 50 /tmp/h5-app-backend.log
 tail -n 50 /tmp/h5-app-celery.log
+tail -n 50 /tmp/h5-app-scheduler.log
 ```
 
 ### 重载后端服务
@@ -113,6 +122,24 @@ launchctl bootstrap gui/$(id -u) /Users/ec2-user/h5-app/backend/launchd/com.h5ap
 
 launchctl bootout gui/$(id -u) /Users/ec2-user/h5-app/backend/launchd/com.h5app.celery.plist
 launchctl bootstrap gui/$(id -u) /Users/ec2-user/h5-app/backend/launchd/com.h5app.celery.plist
+
+launchctl bootout gui/$(id -u) /Users/ec2-user/h5-app/backend/launchd/com.h5app.scheduler.plist
+launchctl bootstrap gui/$(id -u) /Users/ec2-user/h5-app/backend/launchd/com.h5app.scheduler.plist
+```
+
+### 初始化全新 PostgreSQL 数据库
+
+```bash
+cd /Users/ec2-user/h5-app/backend
+source venv/bin/activate
+createdb h5app
+python scripts/migrate_single_host_scheduler.py
+```
+
+如需对其他 PostgreSQL 库初始化，可显式传入：
+
+```bash
+python scripts/migrate_single_host_scheduler.py --database-url postgresql+psycopg://user:pass@host:5432/dbname
 ```
 
 ### 重建前端并重新加载 Nginx

@@ -2,6 +2,9 @@
 
 > 当前这台机器在 2026-04-13 的实际运行状态见：
 > [current-deployment-2026-04-13.md](/Users/ec2-user/h5-app/docs/current-deployment-2026-04-13.md)
+>
+> 切换到全新 PostgreSQL 生产库的执行步骤见：
+> [postgresql-cutover-guide.md](/Users/ec2-user/h5-app/docs/postgresql-cutover-guide.md)
 
 ## 架构概览
 
@@ -24,7 +27,7 @@ Celery Worker
     └── flutter build ios   → iOS .app (zip)
 ```
 
-构建产物保存至 `BUILDS_DIR`，数据库使用 SQLite。
+构建产物保存至 `BUILDS_DIR`，生产默认数据库使用 PostgreSQL。
 
 ---
 
@@ -85,7 +88,7 @@ docker-compose logs -f
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `SECRET_KEY` | `change-me-in-production` | JWT 签名密钥，**生产必须修改** |
-| `DATABASE_URL` | `sqlite:////data/h5app.db` | SQLite 路径 |
+| `DATABASE_URL` | `postgresql+psycopg://h5app:h5app@postgres:5432/h5app` | PostgreSQL 连接串 |
 | `CELERY_BROKER_URL` | `redis://redis:6379/0` | Redis broker 地址 |
 | `CELERY_RESULT_BACKEND` | `redis://redis:6379/0` | Redis result backend 地址 |
 | `BUILDS_DIR` | `/app/builds` | 构建产物存储目录 |
@@ -139,11 +142,20 @@ npm run dev
 
 ```bash
 export SECRET_KEY="your-secret-key"
-export DATABASE_URL="sqlite:///./h5app.db"
+export DATABASE_URL="postgresql+psycopg://h5app:h5app@127.0.0.1:5432/h5app"
 export CELERY_BROKER_URL="redis://localhost:6379/0"
 export CELERY_RESULT_BACKEND="redis://localhost:6379/0"
 export BUILDS_DIR="./builds"
 export REPO_ROOT="/path/to/h5-app"   # 包含 flutter-wrapper 的父目录
+```
+
+### 初始化全新 PostgreSQL 数据库
+
+```bash
+cd backend
+source venv/bin/activate
+createdb h5app
+python scripts/migrate_single_host_scheduler.py
 ```
 
 ---
@@ -280,4 +292,4 @@ python -m pytest tests/ -v
 2. **HTTPS**：在 Nginx 前置层配置 TLS 证书（如 Let's Encrypt）
 3. **并发控制**：根据服务器 CPU 核心数调整 `--concurrency`（Android 构建每次约 2–5 分钟，iOS 约 1–3 分钟）
 4. **磁盘清理**：`BUILDS_DIR` 会积累产物，建议定期清理或设置保留策略
-5. **SQLite 限制**：高并发场景建议迁移至 PostgreSQL，修改 `DATABASE_URL` 即可
+5. **数据库建议**：生产环境使用 PostgreSQL，不建议继续使用 SQLite

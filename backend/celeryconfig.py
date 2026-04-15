@@ -8,3 +8,5 @@ accept_content = ["json"]
 task_soft_time_limit = 1800   # 30 min
 task_time_limit = 2700         # 45 min
 worker_concurrency = 2
+task_create_missing_queues = True
+task_track_started = True

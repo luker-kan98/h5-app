@@ -1,5 +1,8 @@
+import json
 import os
+import plistlib
 import tempfile
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -148,6 +151,118 @@ def test_build_windows_calls_electron_builder():
 
 
 # ---------------------------------------------------------------------------
+# workspace preparation helpers
+# ---------------------------------------------------------------------------
+
+def test_configure_android_project_updates_label_and_package(tmp_path):
+    from app.tasks.build_task import _configure_android_project
+
+    flutter_dir = tmp_path / "flutter"
+    manifest_path = flutter_dir / "android/app/src/main/AndroidManifest.xml"
+    gradle_path = flutter_dir / "android/app/build.gradle.kts"
+    old_activity_path = flutter_dir / "android/app/src/main/kotlin/com/h5packager/h5_app/MainActivity.kt"
+
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    gradle_path.parent.mkdir(parents=True, exist_ok=True)
+    old_activity_path.parent.mkdir(parents=True, exist_ok=True)
+
+    manifest_path.write_text(
+        '<application android:label="h5_app" android:icon="@mipmap/ic_launcher"></application>',
+        encoding="utf-8",
+    )
+    gradle_path.write_text(
+        'android {\n    namespace = "com.h5packager.h5_app"\n    defaultConfig {\n'
+        '        applicationId = "com.h5packager.h5_app"\n    }\n}\n',
+        encoding="utf-8",
+    )
+    old_activity_path.write_text(
+        "package com.h5packager.h5_app\n\nclass MainActivity\n",
+        encoding="utf-8",
+    )
+
+    _configure_android_project(str(flutter_dir), "Example App", "com.example.app")
+
+    assert 'android:label="Example App"' in manifest_path.read_text(encoding="utf-8")
+    gradle_text = gradle_path.read_text(encoding="utf-8")
+    assert 'namespace = "com.example.app"' in gradle_text
+    assert 'applicationId = "com.example.app"' in gradle_text
+
+    new_activity_path = flutter_dir / "android/app/src/main/kotlin/com/example/app/MainActivity.kt"
+    assert new_activity_path.exists()
+    assert "package com.example.app" in new_activity_path.read_text(encoding="utf-8")
+    assert not old_activity_path.exists()
+
+
+def test_configure_ios_project_updates_bundle_names(tmp_path):
+    from app.tasks.build_task import _configure_ios_project
+
+    flutter_dir = tmp_path / "flutter"
+    info_plist_path = flutter_dir / "ios/Runner/Info.plist"
+    info_plist_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(info_plist_path, "wb") as f:
+        plistlib.dump(
+            {
+                "CFBundleDisplayName": "H5 App",
+                "CFBundleName": "h5_app",
+            },
+            f,
+        )
+
+    _configure_ios_project(str(flutter_dir), "Example App")
+
+    with open(info_plist_path, "rb") as f:
+        plist_data = plistlib.load(f)
+    assert plist_data["CFBundleDisplayName"] == "Example App"
+    assert plist_data["CFBundleName"] == "Example App"
+
+
+def test_prepare_electron_updates_metadata_and_icons(tmp_path):
+    from app.tasks.build_task import _prepare_electron
+
+    source_dir = tmp_path / "electron-src"
+    source_dir.mkdir()
+    (source_dir / "main.js").write_text("const H5_URL = '__H5_URL__';\n", encoding="utf-8")
+    (source_dir / "package.json").write_text(
+        json.dumps(
+            {
+                "name": "demo",
+                "build": {
+                    "productName": "H5 App",
+                    "mac": {"target": "dmg"},
+                    "win": {"target": "nsis"},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with patch("app.tasks.build_task.ELECTRON_WRAPPER_SRC", str(source_dir)), \
+         patch("app.tasks.build_task._run"), \
+         patch(
+             "app.tasks.build_task.generate_macos_icon",
+             side_effect=lambda _icon, electron_dir: str(Path(electron_dir) / "build-resources/icon.icns"),
+         ), \
+         patch(
+             "app.tasks.build_task.generate_windows_icon",
+             side_effect=lambda _icon, electron_dir: str(Path(electron_dir) / "build-resources/icon.ico"),
+         ):
+        electron_dir = _prepare_electron(
+            "https://example.com",
+            "Example App",
+            "/tmp/icon.png",
+            str(tmp_path / "work"),
+            ["macos", "windows"],
+        )
+
+    assert "__H5_URL__" not in Path(electron_dir, "main.js").read_text(encoding="utf-8")
+    package_data = json.loads(Path(electron_dir, "package.json").read_text(encoding="utf-8"))
+    assert package_data["build"]["productName"] == "Example App"
+    assert package_data["build"]["mac"]["icon"] == "build-resources/icon.icns"
+    assert package_data["build"]["win"]["icon"] == "build-resources/icon.ico"
+
+
+# ---------------------------------------------------------------------------
 # build_app task — status and cleanup
 # ---------------------------------------------------------------------------
 
@@ -179,6 +294,7 @@ def test_build_app_updates_status_to_running(db):
              "android": MagicMock(side_effect=RuntimeError("build skipped in test"))
          }), \
          patch("app.tasks.build_task.shutil.copytree"), \
+         patch("app.tasks.build_task._prepare_flutter_workspace"), \
          patch("app.tasks.build_task._run"), \
          patch("app.tasks.build_task.subprocess.run"), \
          patch("app.tasks.build_task.os.makedirs"), \
@@ -210,6 +326,7 @@ def test_build_app_cleans_up_tmp_on_failure():
     mock_db = MagicMock()
     with patch("app.tasks.build_task._get_db", return_value=mock_db), \
          patch("app.tasks.build_task.shutil.copytree"), \
+         patch("app.tasks.build_task._prepare_flutter_workspace"), \
          patch("app.tasks.build_task._run"), \
          patch("app.tasks.build_task.subprocess.run"), \
          patch("app.tasks.build_task.os.makedirs"), \
@@ -275,6 +392,7 @@ def test_build_app_cleans_up_custom_keystore_dir(db):
              "android": MagicMock(side_effect=RuntimeError("skip"))
          }), \
          patch("app.tasks.build_task.shutil.copytree"), \
+         patch("app.tasks.build_task._prepare_flutter_workspace"), \
          patch("app.tasks.build_task._run"), \
          patch("app.tasks.build_task.subprocess.run"), \
          patch("app.tasks.build_task.os.makedirs"), \
@@ -286,3 +404,56 @@ def test_build_app_cleans_up_custom_keystore_dir(db):
         build_app.run(job.id, "https://example.com", ["android"], keystore_params)
 
     assert not os.path.exists(ks_staging_dir), "Keystore staging directory should be removed after build"
+
+
+def test_build_app_cleans_up_custom_icon_dir(db):
+    import json
+    from app.models.build_job import BuildJob
+    from app.models.user import User
+
+    user = User(username="icon-worker", password="x")
+    db.add(user)
+    db.commit()
+    job = BuildJob(
+        task_id="test-task-icon",
+        user_id=user.id,
+        h5_url="https://example.com",
+        status="pending",
+        requested_platforms=json.dumps(["android"]),
+    )
+    db.add(job)
+    db.commit()
+
+    icon_staging_dir = tempfile.mkdtemp(prefix="icon-test-")
+    custom_icon_path = os.path.join(icon_staging_dir, "icon.png")
+    with open(custom_icon_path, "wb") as f:
+        f.write(b"fake-icon")
+
+    engine = db.get_bind()
+    SessionFactory = sessionmaker(bind=engine)
+
+    icon_params = {"path": custom_icon_path}
+
+    original_rmtree = __import__("shutil").rmtree
+
+    def selective_rmtree(path, **kwargs):
+        if path != "/tmp/fake-build-dir":
+            original_rmtree(path, **kwargs)
+
+    with patch("app.tasks.build_task._get_db", side_effect=lambda: SessionFactory()), \
+         patch("app.tasks.build_task.PLATFORM_BUILDERS", {
+             "android": MagicMock(side_effect=RuntimeError("skip"))
+         }), \
+         patch("app.tasks.build_task.shutil.copytree"), \
+         patch("app.tasks.build_task._prepare_flutter_workspace"), \
+         patch("app.tasks.build_task._run"), \
+         patch("app.tasks.build_task.subprocess.run"), \
+         patch("app.tasks.build_task.os.makedirs"), \
+         patch("app.tasks.build_task.shutil.rmtree", side_effect=selective_rmtree), \
+         patch("app.tasks.build_task.artifact_dir", return_value="/tmp/fake-out"), \
+         patch("app.tasks.build_task.artifact_path", return_value="/tmp/fake-out/android.apk"), \
+         patch("app.tasks.build_task.tempfile.mkdtemp", return_value="/tmp/fake-build-dir"):
+        from app.tasks.build_task import build_app
+        build_app.run(job.id, "https://example.com", ["android"], None, "Example App", icon_params, "com.example.app")
+
+    assert not os.path.exists(icon_staging_dir), "Icon staging directory should be removed after build"
