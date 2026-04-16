@@ -22,6 +22,10 @@
 postgresql+psycopg://h5app:replace-this-password@127.0.0.1:5432/h5app
 ```
 
+生产模板文件：
+
+- [.env.production.example](/Users/hhy/project/h5-app/backend/.env.production.example)
+
 ## 1. 安装 PostgreSQL
 
 如果机器尚未安装 PostgreSQL，执行：
@@ -100,9 +104,59 @@ pip install -r requirements.txt
 - `psycopg[binary]`
 - `psutil`
 
+## 4.1 一键引导脚本
+
+如果你希望把安装和初始化串起来执行，可以直接使用：
+
+```bash
+cd /Users/ec2-user/h5-app/backend
+chmod +x scripts/bootstrap_postgres_ec2_mac.sh
+APP_DB_PASSWORD='replace-this-password' \
+SECRET_KEY_VALUE='replace-with-random-secret' \
+RELOAD_SERVICES=1 \
+./scripts/bootstrap_postgres_ec2_mac.sh
+```
+
+脚本位置：
+
+- [bootstrap_postgres_ec2_mac.sh](/Users/hhy/project/h5-app/backend/scripts/bootstrap_postgres_ec2_mac.sh)
+
+默认行为：
+
+- 若缺少 PostgreSQL，则通过 `brew install postgresql@16` 安装
+- 启动 `brew services start postgresql@16`
+- 确保 `h5app` 用户和 `h5app` 数据库存在
+- 安装后端依赖
+- 初始化 schema
+- 当 `RELOAD_SERVICES=1` 时，重载 backend / celery / scheduler
+
+如果你只想初始化数据库，不想动运行中的服务，保留默认：
+
+```bash
+RELOAD_SERVICES=0 ./scripts/bootstrap_postgres_ec2_mac.sh
+```
+
 ## 5. 设置数据库连接串
 
-本次切换推荐显式导出环境变量，不依赖脚本里的默认密码：
+本次切换推荐先落 `.env.production`，让 `launchd` 和三个启动脚本统一从同一个文件读配置：
+
+```bash
+cd /Users/ec2-user/h5-app/backend
+cp .env.production.example .env.production
+```
+
+编辑 `.env.production`，至少替换：
+
+- `SECRET_KEY`
+- `DATABASE_URL`
+
+三个 `launchd plist` 已显式注入：
+
+- `ENV_FILE=/Users/ec2-user/h5-app/backend/.env.production`
+
+所以只要这个文件存在，backend / celery / scheduler 启动时都会优先加载它。
+
+如果你需要临时验证，也可以显式导出环境变量，不依赖文件：
 
 ```bash
 export DATABASE_URL="postgresql+psycopg://h5app:replace-this-password@127.0.0.1:5432/h5app"
@@ -113,7 +167,7 @@ export BUILDS_DIR="/Users/ec2-user/h5-app/builds"
 export REPO_ROOT="/Users/ec2-user/h5-app"
 ```
 
-如果你希望这些值持久生效，可以写进 `~/.zprofile` 或 `launchd` 受控脚本。
+如果你已经写好 `.env.production`，这一步可以跳过。
 
 ## 6. 初始化全新数据库 schema
 

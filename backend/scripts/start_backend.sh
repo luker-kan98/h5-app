@@ -2,6 +2,11 @@
 
 cd /Users/ec2-user/h5-app/backend || exit 1
 
+export ENV_FILE="${ENV_FILE:-/Users/ec2-user/h5-app/backend/.env.production}"
+if [ -f "$ENV_FILE" ]; then
+  source "$ENV_FILE"
+fi
+
 export PATH="/opt/homebrew/opt/python@3.12/libexec/bin:/opt/homebrew/opt/openjdk@17/bin:$PATH"
 export JAVA_HOME="/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"
 export ANDROID_HOME="/opt/homebrew/share/android-commandlinetools"

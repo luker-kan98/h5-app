@@ -8,6 +8,23 @@
   <array>
     <string>/Users/ec2-user/h5-app/backend/scripts/start_celery.sh</string>
   </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>ENV_FILE</key>
+    <string>/Users/ec2-user/h5-app/backend/.env.production</string>
+    <key>SECRET_KEY</key>
+    <string>replace-with-random-secret</string>
+    <key>DATABASE_URL</key>
+    <string>postgresql+psycopg://h5app:replace-this-password@127.0.0.1:5432/h5app</string>
+    <key>CELERY_BROKER_URL</key>
+    <string>redis://127.0.0.1:6379/0</string>
+    <key>CELERY_RESULT_BACKEND</key>
+    <string>redis://127.0.0.1:6379/0</string>
+    <key>BUILDS_DIR</key>
+    <string>/Users/ec2-user/h5-app/builds</string>
+    <key>REPO_ROOT</key>
+    <string>/Users/ec2-user/h5-app</string>
+  </dict>
   <key>WorkingDirectory</key>
   <string>/Users/ec2-user/h5-app/backend</string>
   <key>RunAtLoad</key>

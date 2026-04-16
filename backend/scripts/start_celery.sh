@@ -2,6 +2,11 @@
 
 cd /Users/ec2-user/h5-app/backend || exit 1
 
+export ENV_FILE="${ENV_FILE:-/Users/ec2-user/h5-app/backend/.env.production}"
+if [ -f "$ENV_FILE" ]; then
+  source "$ENV_FILE"
+fi
+
 export NVM_DIR="/Users/ec2-user/.nvm"
 if [ -s "$NVM_DIR/nvm.sh" ]; then
   source "$NVM_DIR/nvm.sh"

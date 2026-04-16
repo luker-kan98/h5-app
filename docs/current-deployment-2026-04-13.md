@@ -78,6 +78,14 @@ JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
 ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
 ```
 
+生产推荐配置文件：
+
+- `/Users/ec2-user/h5-app/backend/.env.production`
+- 模板文件：[.env.production.example](/Users/hhy/project/h5-app/backend/.env.production.example)
+
+当前三个 `launchd plist` 都显式注入了 `ENV_FILE=/Users/ec2-user/h5-app/backend/.env.production`。
+如果该文件存在，启动脚本会优先加载其中的生产值。
+
 ## 日志位置
 
 - Nginx access log：`/tmp/h5-app-nginx-access.log`

@@ -5,6 +5,12 @@
 如果你要的是直接在 EC2 Mac 上逐条执行的命令版，见：
 [postgresql-cutover-ec2-mac.md](/Users/ec2-user/h5-app/docs/postgresql-cutover-ec2-mac.md)
 
+如果你要的是自动化执行脚本，见：
+[bootstrap_postgres_ec2_mac.sh](/Users/hhy/project/h5-app/backend/scripts/bootstrap_postgres_ec2_mac.sh)
+
+生产环境变量模板见：
+[.env.production.example](/Users/hhy/project/h5-app/backend/.env.production.example)
+
 适用范围：
 
 - 当前后端运行在单机 EC2 Mac 上
@@ -129,7 +135,27 @@ migration_recorded=true
 
 ## 5. 配置运行环境
 
-当前三个启动脚本都支持环境变量覆盖默认值。
+当前三个启动脚本都会优先加载：
+
+```bash
+/Users/ec2-user/h5-app/backend/.env.production
+```
+
+建议先复制模板：
+
+```bash
+cd /Users/ec2-user/h5-app/backend
+cp .env.production.example .env.production
+```
+
+然后替换其中的真实值，至少包括：
+
+- `SECRET_KEY`
+- `DATABASE_URL`
+- `CELERY_BROKER_URL`
+- `CELERY_RESULT_BACKEND`
+- `BUILDS_DIR`
+- `REPO_ROOT`
 
 建议在正式环境中显式设置：
 
@@ -142,7 +168,17 @@ export BUILDS_DIR="/Users/ec2-user/h5-app/builds"
 export REPO_ROOT="/Users/ec2-user/h5-app"
 ```
 
-如果继续使用当前脚本中的默认值，也能启动，但默认密码和 `SECRET_KEY` 不适合生产。
+另外，三个 `launchd plist` 现在也显式注入了：
+
+- `ENV_FILE=/Users/ec2-user/h5-app/backend/.env.production`
+- `SECRET_KEY`
+- `DATABASE_URL`
+- `CELERY_BROKER_URL`
+- `CELERY_RESULT_BACKEND`
+- `BUILDS_DIR`
+- `REPO_ROOT`
+
+如果 `.env.production` 存在，则启动脚本会优先加载文件中的生产值。
 
 ## 6. 重载三个服务
 
