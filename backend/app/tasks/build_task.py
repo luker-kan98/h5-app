@@ -26,6 +26,8 @@ from app.services.icon_service import (
     generate_windows_icon,
 )
 from app.services.build_scheduler import refresh_request_status, run_scheduler_once
+from app.services.runtime_schema import ensure_build_task_artifact_columns
+from app.services.s3_service import s3_upload_configured, upload_build_artifact
 
 celery_app = Celery("h5packager")
 celery_app.config_from_object("celeryconfig")
@@ -34,6 +36,9 @@ REPO_ROOT = os.getenv("REPO_ROOT", os.path.abspath(os.path.join(os.path.dirname(
 FLUTTER_WRAPPER_SRC = os.path.join(REPO_ROOT, "flutter-wrapper")
 ELECTRON_WRAPPER_SRC = os.path.join(REPO_ROOT, "electron-wrapper")
 BUILDS_DIR = os.getenv("BUILDS_DIR", os.path.join(REPO_ROOT, "builds"))
+_session_factory_options = getattr(SessionLocal, "kw", {})
+if _session_factory_options.get("bind") is not None:
+    ensure_build_task_artifact_columns(_session_factory_options["bind"])
 
 
 def _get_db() -> Session:
@@ -322,13 +327,7 @@ def build_app(self, job_id: int, h5_url: str, platforms: list,
                     src_path = builder(h5_url, flutter_tmp)
                 else:
                     src_path = builder(h5_url, electron_tmp)
-                dest = artifact_path(self.request.id, platform)
-                if os.path.isdir(src_path):
-                    base = dest.replace(".zip", "")
-                    shutil.make_archive(base, "zip", src_path)
-                    dest = base + ".zip" if not dest.endswith(".zip") else dest
-                else:
-                    shutil.copy2(src_path, dest)
+                dest, _, _ = _store_artifact(self.request.id, platform, src_path)
                 updates[PLATFORM_PATH_ATTRS[platform]] = dest
             except Exception as e:
                 updates[PLATFORM_ERROR_ATTRS[platform]] = str(e)
@@ -403,6 +402,23 @@ def _mark_request_inputs_complete_if_finished(db: Session, request: BuildRequest
         shutil.rmtree(path, ignore_errors=True)
 
 
+def _store_artifact(task_id: str, platform: str, src_path: str) -> tuple[str, str | None, str | None]:
+    dest = artifact_path(task_id, platform)
+    if os.path.isdir(src_path):
+        base = dest.replace(".zip", "")
+        shutil.make_archive(base, "zip", src_path)
+        dest = base + ".zip" if not dest.endswith(".zip") else dest
+    else:
+        shutil.copy2(src_path, dest)
+
+    artifact_s3_key = None
+    artifact_url = None
+    if s3_upload_configured():
+        artifact_s3_key, artifact_url = upload_build_artifact(dest, task_id, PLATFORM_FILENAMES[platform])
+
+    return dest, artifact_s3_key, artifact_url
+
+
 @celery_app.task(name="execute_build_task", bind=True)
 def execute_build_task(self, build_task_id: int):
     db = _get_db()
@@ -470,16 +486,16 @@ def execute_build_task(self, build_task_id: int):
         else:
             src_path = builder(request.h5_url, electron_tmp)
 
-        dest = artifact_path(request.request_id, platform)
-        if os.path.isdir(src_path):
-            base = dest.replace(".zip", "")
-            shutil.make_archive(base, "zip", src_path)
-            dest = base + ".zip" if not dest.endswith(".zip") else dest
-        else:
-            shutil.copy2(src_path, dest)
+        task.status = "uploading"
+        db.commit()
+        refresh_request_status(db, request.id)
+
+        dest, artifact_s3_key, artifact_url = _store_artifact(request.request_id, platform, src_path)
 
         task.status = "done"
         task.artifact_path = dest
+        task.artifact_s3_key = artifact_s3_key
+        task.artifact_url = artifact_url
         task.failure_code = None
         task.failure_message = None
         task.finished_at = datetime.now(timezone.utc)

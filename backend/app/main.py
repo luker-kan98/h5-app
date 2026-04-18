@@ -5,8 +5,10 @@ from fastapi.middleware.cors import CORSMiddleware
 import app.models
 from app.database import Base, engine
 from app.api import auth, build
+from app.services.runtime_schema import ensure_build_task_artifact_columns
 
 Base.metadata.create_all(bind=engine)
+ensure_build_task_artifact_columns(engine)
 
 app = FastAPI(title="H5 App Packager")
 

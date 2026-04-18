@@ -457,3 +457,83 @@ def test_build_app_cleans_up_custom_icon_dir(db):
         build_app.run(job.id, "https://example.com", ["android"], None, "Example App", icon_params, "com.example.app")
 
     assert not os.path.exists(icon_staging_dir), "Icon staging directory should be removed after build"
+
+
+def test_execute_build_task_uploads_artifact_to_s3_and_persists_url(db, tmp_path):
+    from app.models.build_request import BuildRequest
+    from app.models.build_task import BuildTask
+    from app.models.user import User
+
+    user = User(username="s3-worker", password="x")
+    db.add(user)
+    db.commit()
+
+    request = BuildRequest(
+        request_id="request-s3-1",
+        user_id=user.id,
+        h5_url="https://example.com",
+        app_name="Example App",
+        requested_platforms=json.dumps(["android"]),
+        status="queued",
+        android_package_name="com.example.app",
+    )
+    db.add(request)
+    db.commit()
+    db.refresh(request)
+
+    task = BuildTask(
+        task_id="task-s3-1",
+        request_id=request.id,
+        platform="android",
+        status="queued",
+        resource_profile="android",
+    )
+    db.add(task)
+    db.commit()
+
+    source_artifact = tmp_path / "app-release.apk"
+    source_artifact.write_bytes(b"fake-apk")
+
+    output_dir = tmp_path / request.request_id
+    output_path = output_dir / "android.apk"
+    worker_tmp = tmp_path / "worker-tmp"
+    worker_tmp.mkdir()
+
+    engine = db.get_bind()
+    SessionFactory = sessionmaker(bind=engine)
+
+    with patch("app.tasks.build_task._get_db", side_effect=lambda: SessionFactory()), \
+         patch("app.tasks.build_task.PLATFORM_BUILDERS", {
+             "android": MagicMock(return_value=str(source_artifact))
+         }), \
+         patch("app.tasks.build_task.shutil.copytree"), \
+         patch("app.tasks.build_task._prepare_flutter_workspace"), \
+         patch("app.tasks.build_task._run"), \
+         patch("app.tasks.build_task.tempfile.mkdtemp", return_value=str(worker_tmp)), \
+         patch("app.tasks.build_task.s3_upload_configured", return_value=True), \
+         patch(
+             "app.tasks.build_task.upload_build_artifact",
+             return_value=(
+                 "uploads/request-s3-1/android.apk",
+                 "https://macosbuckets3.s3.ap-east-1.amazonaws.com/uploads/request-s3-1/android.apk",
+             ),
+         ) as mock_upload, \
+         patch("app.tasks.build_task.run_scheduler_once"), \
+         patch("app.tasks.build_task.refresh_request_status"), \
+         patch("app.tasks.build_task.artifact_dir", return_value=str(output_dir)), \
+         patch("app.tasks.build_task.artifact_path", return_value=str(output_path)), \
+         patch("app.tasks.build_task.shutil.rmtree"):
+        from app.tasks.build_task import execute_build_task
+        execute_build_task.run(task.id)
+
+    check_session = SessionFactory()
+    try:
+        refreshed = check_session.query(BuildTask).filter(BuildTask.id == task.id).one()
+    finally:
+        check_session.close()
+
+    assert refreshed.status == "done"
+    assert refreshed.artifact_path == str(output_path)
+    assert refreshed.artifact_s3_key == "uploads/request-s3-1/android.apk"
+    assert refreshed.artifact_url == "https://macosbuckets3.s3.ap-east-1.amazonaws.com/uploads/request-s3-1/android.apk"
+    mock_upload.assert_called_once_with(str(output_path), "request-s3-1", "android.apk")

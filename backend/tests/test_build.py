@@ -1,5 +1,6 @@
 import io
 import os
+import json
 from unittest.mock import patch
 
 from PIL import Image
@@ -246,3 +247,91 @@ def test_submit_build_rejects_invalid_platform(client, auth_headers, tmp_path):
             headers=auth_headers,
         )
     assert resp.status_code == 422
+
+
+def test_get_build_status_returns_s3_download_url(client, auth_headers, db):
+    from app.models.build_request import BuildRequest
+    from app.models.build_task import BuildTask
+    from app.models.user import User
+
+    user = db.query(User).filter(User.username == "testuser").one()
+
+    request = BuildRequest(
+        request_id="request-s3-status",
+        user_id=user.id,
+        h5_url="https://example.com",
+        app_name="Example App",
+        requested_platforms=json.dumps(["android"]),
+        status="done",
+        android_package_name="com.example.app",
+    )
+    db.add(request)
+    db.commit()
+    db.refresh(request)
+
+    task = BuildTask(
+        task_id="task-s3-status",
+        request_id=request.id,
+        platform="android",
+        status="done",
+        resource_profile="android",
+        artifact_path="/tmp/request-s3-status/android.apk",
+        artifact_url="https://macosbuckets3.s3.ap-east-1.amazonaws.com/uploads/request-s3-status/android.apk",
+    )
+    db.add(task)
+    db.commit()
+
+    with patch("app.api.build.refresh_request_status", return_value="done"), \
+         patch("app.api.build.estimate_request_wait_seconds", return_value=0):
+        resp = client.get("/build/request-s3-status", headers=auth_headers)
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["platforms"]["android"]["status"] == "done"
+    assert body["platforms"]["android"]["download_url"] == (
+        "https://macosbuckets3.s3.ap-east-1.amazonaws.com/uploads/request-s3-status/android.apk"
+    )
+
+
+def test_download_file_redirects_to_s3_url(client, auth_headers, db):
+    from app.models.build_request import BuildRequest
+    from app.models.build_task import BuildTask
+    from app.models.user import User
+
+    user = db.query(User).filter(User.username == "testuser").one()
+
+    request = BuildRequest(
+        request_id="request-s3-download",
+        user_id=user.id,
+        h5_url="https://example.com",
+        app_name="Example App",
+        requested_platforms=json.dumps(["android"]),
+        status="done",
+        android_package_name="com.example.app",
+    )
+    db.add(request)
+    db.commit()
+    db.refresh(request)
+
+    task = BuildTask(
+        task_id="task-s3-download",
+        request_id=request.id,
+        platform="android",
+        status="done",
+        resource_profile="android",
+        artifact_path="/tmp/request-s3-download/android.apk",
+        artifact_url="https://macosbuckets3.s3.ap-east-1.amazonaws.com/uploads/request-s3-download/android.apk",
+    )
+    db.add(task)
+    db.commit()
+
+    resp = client.get(
+        "/files/request-s3-download/android.apk",
+        headers=auth_headers,
+        follow_redirects=False,
+    )
+
+    assert resp.status_code in (302, 307)
+    assert resp.headers["location"] == (
+        "https://macosbuckets3.s3.ap-east-1.amazonaws.com/uploads/request-s3-download/android.apk"
+    )

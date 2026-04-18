@@ -24,6 +24,7 @@ backend/builds/
 # Env
 .env
 .env.local
+backend/.env.production
 
 # Redis dump
 dump.rdb

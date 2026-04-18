@@ -26,6 +26,10 @@ def download_url(task_id: str, platform: str) -> str:
     return f"/files/{task_id}/{PLATFORM_FILENAMES[platform]}"
 
 
+def task_download_url(task_id: str, platform: str, artifact_url: str | None) -> str:
+    return artifact_url or download_url(task_id, platform)
+
+
 def build_job_to_status_response(job: BuildJob) -> dict:
     """Convert BuildJob ORM object to the BuildStatusResponse dict format."""
     requested = json.loads(job.requested_platforms)
@@ -65,7 +69,7 @@ def build_request_to_status_response(
     platforms = {
         task.platform: {
             "status": "done",
-            "download_url": download_url(request.request_id, task.platform),
+            "download_url": task_download_url(request.request_id, task.platform, task.artifact_url),
         }
         if task.artifact_path
         else {"status": "failed", "error": task.failure_message}

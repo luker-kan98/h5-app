@@ -5,7 +5,7 @@ import uuid
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db, get_current_user
@@ -210,6 +210,8 @@ def download_file(
         ).first()
         if task is None or not task.artifact_path:
             raise HTTPException(status_code=404, detail="File not found")
+        if task.artifact_url:
+            return RedirectResponse(task.artifact_url)
         file_path = task.artifact_path
     else:
         job = db.query(BuildJob).filter(

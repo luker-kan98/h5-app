@@ -25,10 +25,11 @@ class BuildTask(Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     artifact_path: Mapped[str | None] = mapped_column(String, nullable=True)
+    artifact_s3_key: Mapped[str | None] = mapped_column(String, nullable=True)
+    artifact_url: Mapped[str | None] = mapped_column(String, nullable=True)
     log_path: Mapped[str | None] = mapped_column(String, nullable=True)
     failure_code: Mapped[str | None] = mapped_column(String, nullable=True)
     failure_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
-
