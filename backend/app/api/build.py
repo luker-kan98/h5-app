@@ -56,6 +56,14 @@ async def submit_build(
     except UrlValidationError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
+    # Reject duplicate URL submissions (allow re-submit if all prior requests failed)
+    existing = db.query(BuildRequest).filter(
+        BuildRequest.h5_url == h5_url,
+        BuildRequest.status.notin_(["failed"]),
+    ).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="该URL已提交过打包，不能重复提交")
+
     # Validate platforms
     invalid = set(platforms) - VALID_PLATFORMS
     if invalid or not platforms:
@@ -139,7 +147,8 @@ async def submit_build(
         run_scheduler_once(db)
     except Exception:
         # Submission must stay durable even if the scheduler is temporarily unavailable.
-        pass
+        # Roll back so the session is usable for the follow-up queries below.
+        db.rollback()
 
     db.refresh(build_request)
     refresh_request_status(db, build_request.id)
@@ -150,6 +159,76 @@ async def submit_build(
         request_id=build_request.request_id,
         task_ids=[task.task_id for task in tasks],
         queue_state=build_request.status,
+        estimated_wait_seconds=estimate,
+    )
+
+
+@router.post("/rebuild/{request_id}", response_model=BuildSubmitResponse)
+def rebuild(
+    request_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    original = db.query(BuildRequest).filter(
+        BuildRequest.request_id == request_id,
+        BuildRequest.user_id == current_user.id,
+    ).first()
+    if not original:
+        raise HTTPException(status_code=404, detail="Build request not found")
+    if original.status != "failed":
+        raise HTTPException(status_code=400, detail="Only failed builds can be rebuilt")
+    if original.icon_path and not os.path.isfile(original.icon_path):
+        raise HTTPException(status_code=422, detail="Original icon file missing, please submit a new build")
+
+    platforms = json.loads(original.requested_platforms)
+    new_request = BuildRequest(
+        request_id=str(uuid.uuid4()),
+        user_id=current_user.id,
+        h5_url=original.h5_url,
+        app_name=original.app_name,
+        status="submitted",
+        requested_platforms=original.requested_platforms,
+        android_package_name=original.android_package_name,
+        icon_path=original.icon_path,
+        keystore_path=original.keystore_path,
+        keystore_password=original.keystore_password,
+        key_alias=original.key_alias,
+        key_password=original.key_password,
+    )
+    db.add(new_request)
+    db.commit()
+    db.refresh(new_request)
+
+    tasks = [
+        BuildTask(
+            task_id=str(uuid.uuid4()),
+            request_id=new_request.id,
+            platform=platform,
+            status="submitted",
+            priority=new_request.priority,
+            resource_profile=resource_profile_name(platform),
+        )
+        for platform in platforms
+    ]
+    db.add_all(tasks)
+    db.commit()
+    for task in tasks:
+        db.refresh(task)
+
+    try:
+        run_scheduler_once(db)
+    except Exception:
+        db.rollback()
+
+    db.refresh(new_request)
+    refresh_request_status(db, new_request.id)
+    estimate = estimate_request_wait_seconds(db, new_request.id)
+
+    return BuildSubmitResponse(
+        task_id=new_request.request_id,
+        request_id=new_request.request_id,
+        task_ids=[task.task_id for task in tasks],
+        queue_state=new_request.status,
         estimated_wait_seconds=estimate,
     )
 

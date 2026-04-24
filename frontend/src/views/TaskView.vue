@@ -22,6 +22,11 @@
           class="mt-4 text-xs text-gray-400 text-center">
           Build finished · <router-link to="/" class="text-blue-600 hover:underline">Start a new one</router-link>
         </p>
+        <button v-if="job?.status === 'failed'" @click="handleRebuild"
+          :disabled="rebuilding"
+          class="mt-3 w-full bg-red-600 text-white rounded py-2 text-sm font-medium hover:bg-red-700 disabled:opacity-50">
+          {{ rebuilding ? '重新打包中…' : '重新打包' }}
+        </button>
       </div>
     </div>
   </div>
@@ -29,12 +34,24 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useBuild } from '@/composables/useBuild'
 import PlatformCard from '@/components/PlatformCard.vue'
 
 const route = useRoute()
-const { getStatus } = useBuild()
+const router = useRouter()
+const { getStatus, rebuildBuild } = useBuild()
+const rebuilding = ref(false)
+
+async function handleRebuild() {
+  rebuilding.value = true
+  try {
+    const newTaskId = await rebuildBuild(route.params.id as string)
+    router.push(`/task/${newTaskId}`)
+  } catch {
+    rebuilding.value = false
+  }
+}
 
 const job = ref<any>(null)
 let timer: ReturnType<typeof setInterval> | null = null

@@ -15,6 +15,9 @@ def run_scheduler_cycle() -> dict[str, int]:
     db = SessionLocal()
     try:
         return run_scheduler_once(db)
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 

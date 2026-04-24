@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Float, Integer, String
+from sqlalchemy import BigInteger, DateTime, Float, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -16,9 +16,9 @@ class HostResourceSample(Base):
     )
     cpu_percent: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     load_1m: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
-    memory_used_bytes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    memory_available_bytes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    swap_used_bytes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    disk_free_bytes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    memory_used_bytes: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    memory_available_bytes: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    swap_used_bytes: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    disk_free_bytes: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
     active_task_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     waiting_task_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

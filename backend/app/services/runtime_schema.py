@@ -22,3 +22,31 @@ def ensure_build_task_artifact_columns(engine: Engine) -> None:
     with engine.begin() as connection:
         for statement in statements:
             connection.execute(text(statement))
+
+
+def ensure_host_sample_bigint_columns(engine: Engine) -> None:
+    if engine.dialect.name != "postgresql":
+        return
+    inspector = inspect(engine)
+    if "host_resource_samples" not in inspector.get_table_names():
+        return
+
+    byte_columns = (
+        "memory_used_bytes",
+        "memory_available_bytes",
+        "swap_used_bytes",
+        "disk_free_bytes",
+    )
+    with engine.begin() as connection:
+        rows = connection.execute(
+            text(
+                "SELECT column_name, data_type FROM information_schema.columns "
+                "WHERE table_name = 'host_resource_samples'"
+            )
+        ).fetchall()
+        current = {name: data_type for name, data_type in rows}
+        for column in byte_columns:
+            if current.get(column) == "integer":
+                connection.execute(
+                    text(f"ALTER TABLE host_resource_samples ALTER COLUMN {column} TYPE BIGINT")
+                )

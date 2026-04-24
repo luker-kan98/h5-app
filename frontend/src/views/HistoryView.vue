@@ -15,11 +15,19 @@
               {{ item.requested_platforms.join(', ') }}
             </p>
           </div>
-          <router-link :to="`/task/${item.task_id}`"
-            :class="statusClass(item.status)"
-            class="ml-4 text-xs px-2 py-1 rounded shrink-0">
-            {{ item.status }}
-          </router-link>
+          <div class="ml-4 flex items-center gap-2 shrink-0">
+            <router-link :to="`/task/${item.task_id}`"
+              :class="statusClass(item.status)"
+              class="text-xs px-2 py-1 rounded">
+              {{ item.status }}
+            </router-link>
+            <button v-if="item.status === 'failed'"
+              @click.prevent="handleRebuild(item)"
+              class="text-xs px-2 py-1 rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+              :disabled="rebuildingId === (item.request_id || item.task_id)">
+              重新打包
+            </button>
+          </div>
         </div>
       </div>
       <p v-else class="text-sm text-gray-400 text-center mt-16">No builds yet.</p>
@@ -29,10 +37,24 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useBuild } from '@/composables/useBuild'
 
-const { getHistory } = useBuild()
+const router = useRouter()
+const { getHistory, rebuildBuild } = useBuild()
 const items = ref<any[]>([])
+const rebuildingId = ref<string | null>(null)
+
+async function handleRebuild(item: any) {
+  const id = item.request_id || item.task_id
+  rebuildingId.value = id
+  try {
+    const newTaskId = await rebuildBuild(id)
+    router.push(`/task/${newTaskId}`)
+  } catch {
+    rebuildingId.value = null
+  }
+}
 
 function statusClass(status: string) {
   return {
