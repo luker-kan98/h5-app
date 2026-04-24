@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="14px" height="14px" viewBox="0 0 14 14" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>nav_ic_arrow_up@2x</title>
+    <defs>
+        <linearGradient x1="-4.25810133%" y1="50%" x2="100%" y2="50%" id="linearGradient-1">
+            <stop stop-color="#46CF3A" offset="0%"></stop>
+            <stop stop-color="#36CFBC" offset="100%"></stop>
+        </linearGradient>
+    </defs>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Sponsors_Become-our-sponsor" transform="translate(-1204.000000, -22.000000)">
+            <g id="编组-45" transform="translate(728.000000, 18.000000)">
+                <g transform="translate(476.000000, 4.000000)" id="nav_ic_arrow_an">
+                    <rect id="矩形" x="0" y="0" width="14" height="14"></rect>
+                    <polyline id="路径" stroke="url(#linearGradient-1)" stroke-width="2" points="3 5 7 9 11 5"></polyline>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

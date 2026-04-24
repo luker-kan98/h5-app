@@ -1,0 +1,98 @@
+html {
+  @apply text-base font-primary scroll-smooth;
+}
+
+body {
+  @apply text-[14px] bg-[#ffffff] font-primary font-normal leading-relaxed text-text overflow-x-hidden;
+}
+
+body.no-scroll {
+  @apply overflow-hidden fixed w-full;
+}
+
+h1,
+h2,
+h3 {
+  @apply leading-tight text-dark font-primary;
+}
+
+h1 {
+  @apply text-[40px] md:text-[76px] font-medium;
+}
+
+h2 {
+  @apply text-[20px] md:text-[30px] font-medium;
+}
+
+h3 {
+  @apply text-[17px] md:text-[20px] text-dark font-medium;
+}
+
+h4 {
+  @apply text-[25px] md:text-h4 text-dark font-primary font-[500];
+}
+
+h5 {
+  @apply text-h5 font-primary text-dark;
+}
+
+h6 {
+  @apply text-[16px] md:text-[18px] font-primary text-dark;
+}
+
+br {
+  @apply block text-[100%] h-[1] md:h-[6px];
+  content: "";
+}
+
+p, span, a {
+  @apply text-text font-primary leading-normal;
+}
+
+a {
+  @apply hover:text-primary;
+}
+
+.doc h2 {
+  @apply my-[20px] md:mb-[30px] font-[500] text-black text-[25px] md:text-[30px];
+}
+
+.doc h3 {
+  @apply font-[500] text-black text-[20px] leading-[1] md:text-[20px] mt-[30px] mb-[15px];
+}
+
+.doc h4 {
+  @apply font-[500] text-black text-[16px] leading-[2.5];
+}
+
+.doc a {
+  @apply break-all whitespace-pre-wrap;
+}
+
+.doc p {
+  @apply leading-normal mb-[10px];
+}
+
+.doc article a {
+  @apply text-primary;
+}
+
+.doc article a.assets_link {
+  @apply text-text hover:text-primary hover:underline text-[16px];
+}
+
+strong {
+  @apply text-black font-primary font-[500];
+}
+
+.doc td {
+  @apply text-center font-primary h-[36px];
+}
+
+table {
+  @apply font-primary mb-3;
+}
+
+th {
+  @apply font-medium;
+}

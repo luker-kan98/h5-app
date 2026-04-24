@@ -1,0 +1,38 @@
+[
+  {
+    "zh-CN": "首页",
+    "zh": "首頁",
+    "en": "Home",
+    "url": "/"
+  },
+  {
+    "en": "Documentation",
+    "zh-CN": "文件",
+    "zh": "文档",
+    "url": "/doc/v10"
+  },
+  {
+    "en": "Guide",
+    "zh-CN": "指南",
+    "zh": "指南",
+    "url": "/guide"
+  },
+  {
+    "en": "Config",
+    "zh-CN": "配置",
+    "zh": "配置",
+    "url": "/config"
+  },
+  {
+    "en": "Plugin",
+    "zh-CN": "插件",
+    "zh": "插件",
+    "url": "/plugin"
+  },
+  {
+    "en": "Theme",
+    "zh-CN": "插件",
+    "zh": "模板",
+    "url": "/theme"
+  }
+]

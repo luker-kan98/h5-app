@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="110px" height="110px" viewBox="0 0 110 110" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>popup_ic_Detection@2x</title>
+    <defs>
+        <linearGradient x1="50%" y1="0%" x2="50%" y2="100%" id="linearGradient-1">
+            <stop stop-color="#40CC92" offset="0%"></stop>
+            <stop stop-color="#FFFFFF" offset="100%"></stop>
+        </linearGradient>
+        <linearGradient x1="50%" y1="0%" x2="50%" y2="100%" id="linearGradient-2">
+            <stop stop-color="#40CC92" offset="0%"></stop>
+            <stop stop-color="#FFFFFF" offset="100%"></stop>
+        </linearGradient>
+        <path d="M44,0 L13,9.91150442 C13,15.7876106 13,26.159292 13,41.0265487 C13,52.1769912 23.1276596,62.8348083 43.3829787,73 C64.4609929,64.0737463 75,53.4159292 75,41.0265487 C75,28.6371681 75,18.2654867 75,9.91150442 L44,0 Z" id="path-3"></path>
+        <filter x="-53.2%" y="-37.0%" width="206.5%" height="190.4%" filterUnits="objectBoundingBox" id="filter-4">
+            <feOffset dx="0" dy="6" in="SourceAlpha" result="shadowOffsetOuter1"></feOffset>
+            <feGaussianBlur stdDeviation="10" in="shadowOffsetOuter1" result="shadowBlurOuter1"></feGaussianBlur>
+            <feColorMatrix values="0 0 0 0 0.850980392   0 0 0 0 0.901960784   0 0 0 0 0.905882353  0 0 0 0.610860331 0" type="matrix" in="shadowBlurOuter1"></feColorMatrix>
+        </filter>
+    </defs>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="盗版检测_正在检测_1" transform="translate(-905.000000, -419.000000)">
+            <g id="pop" transform="translate(775.000000, 365.000000)">
+                <g id="popup_ic_Detection" transform="translate(130.000000, 54.000000)">
+                    <rect id="矩形" x="0" y="0" width="110" height="110"></rect>
+                    <g id="ic" transform="translate(10.000000, 16.000000)">
+                        <rect id="矩形" fill="url(#linearGradient-1)" x="0" y="6" width="1" height="25"></rect>
+                        <rect id="矩形" fill="url(#linearGradient-1)" x="87" y="24" width="1" height="25"></rect>
+                        <rect id="矩形" fill="url(#linearGradient-2)" opacity="0.265093122" x="6" y="46" width="1" height="17"></rect>
+                        <g id="路径-7">
+                            <use fill="black" fill-opacity="1" filter="url(#filter-4)" xlink:href="#path-3"></use>
+                            <use fill="#FFFFFF" fill-rule="evenodd" xlink:href="#path-3"></use>
+                        </g>
+                        <polyline id="路径-10" stroke="#434753" stroke-width="2" points="19.003375 37.0281494 35.3324889 37.0281494 40.2312231 23.9648582 44.0413497 37.0281494 52.7502104 37.0281494 55.4717294 42.4711874 58.1932484 37.0281494 67.003375 37.0281494"></polyline>
+                        <circle id="椭圆形" stroke="#40CC92" stroke-width="2" fill-opacity="0.3" fill="#40CC92" cx="62" cy="42" r="18"></circle>
+                        <line x1="76.5" y1="54" x2="81" y2="58.5" id="路径-8" stroke="#40CC92" stroke-width="3"></line>
+                        <polygon id="路径-9" fill="#40CC92" points="80 57 80 63 93 76 99 70 86 57"></polygon>
+                    </g>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

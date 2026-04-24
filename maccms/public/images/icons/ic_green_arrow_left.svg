@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="20px" height="20px" viewBox="0 0 20 20" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>com_ic_arrow_left@2x</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="指南_快速上手" transform="translate(-642.000000, -5033.000000)">
+            <g id="底部" transform="translate(641.000000, 4820.000000)">
+                <g id="导航" transform="translate(1.000000, 212.000000)">
+                    <g id="com_ic_arrow_left" transform="translate(10.000000, 11.000000) scale(-1, 1) translate(-10.000000, -11.000000) translate(0.000000, 1.000000)">
+                        <rect id="矩形" x="0" y="0" width="20" height="20"></rect>
+                        <path d="M11.1490441,1.49449384 C11.2528938,1.56571924 11.353171,1.64404041 11.4492665,1.72960992 L11.5775112,1.85065253 L11.5719949,1.85503568 L17.2268312,7.51107943 L15.1375687,9.60034192 L11.0425617,5.50476647 L11.0432335,17.9791594 L8.04323353,17.9791594 L8.04256174,5.38376647 L3.91688208,9.51128167 L1.79556174,7.38996132 L7.33487053,1.85065253 L7.3618811,1.82392298 L7.35939411,1.82216733 C8.391105,0.790456437 9.99597545,0.681231942 11.1490441,1.49449384 Z" id="形状结合" fill="#40CC92" transform="translate(9.511196, 9.467963) rotate(-270.000000) translate(-9.511196, -9.467963) "></path>
+                    </g>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

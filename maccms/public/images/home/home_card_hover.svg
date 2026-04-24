@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="24px" height="24px" viewBox="0 0 24 24" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>home_card_arrow@2x</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="home_2" transform="translate(-618.000000, -526.000000)" fill="#05031A">
+            <g id="下载" transform="translate(390.000000, 498.000000)">
+                <g id="home_card_arrow" transform="translate(240.000000, 40.000000) rotate(-90.000000) translate(-240.000000, -40.000000) translate(210.000000, 10.000000)">
+                    <g transform="translate(18.000000, 18.000000)" id="形状结合">
+                        <path d="M10.0777871,19.1058481 C9.97393742,19.0346227 9.87366015,18.9563015 9.77756474,18.870732 L9.64931998,18.7496894 L9.65483632,18.7453062 L1.0658141e-14,9.08926249 L2.08926249,7 L11.7443369,16.6558057 L21.3099491,7.08906025 L23.4312695,9.21038059 L13.8919607,18.7496894 L13.8649501,18.7764189 L13.8674371,18.7781746 C12.8357262,19.8098855 11.2308557,19.91911 10.0777871,19.1058481 Z"></path>
+                    </g>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

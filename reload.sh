@@ -3,9 +3,12 @@ set -e
 
 ROOT="/Users/ec2-user/h5-app"
 
-echo "==> 重新打包前端..."
-cd "$ROOT/frontend"
-npm run build
+echo "==> 重新打包 maccms (主前端)..."
+cd "$ROOT/maccms"
+if [ ! -d node_modules ]; then
+  yarn install --frozen-lockfile
+fi
+yarn build
 
 echo "==> 重载 nginx..."
 nginx -c "$ROOT/frontend/nginx.local.conf" -s reload
@@ -26,6 +29,6 @@ echo $! > /tmp/h5-app-celery.pid
 sleep 1
 echo ""
 echo "==> 重载完成"
-echo "  前端: http://localhost"
+echo "  前端 (maccms): http://localhost"
 echo "  后端: http://localhost:8000"
 echo "  日志: /tmp/h5-app-backend.log, /tmp/h5-app-celery.log"

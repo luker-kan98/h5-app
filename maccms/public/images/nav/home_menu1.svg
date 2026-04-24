@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="88px" height="88px" viewBox="0 0 88 88" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>home_menu@2x</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="文档" transform="translate(-657.000000, -94.000000)">
+            <g id="Navigation-Bar" transform="translate(0.000000, 88.000000)">
+                <g id="home_menu" transform="translate(657.000000, 6.000000)">
+                    <rect id="矩形" fill="#EAEAEA" opacity="0" x="0" y="0" width="88" height="88"></rect>
+                    <path d="M34,29 L64,29 L64,33 L34,33 L34,29 Z M34,42 L64,42 L64,46 L34,46 L34,42 Z M34,55 L64,55 L64,59 L34,59 L34,55 Z" id="ic" fill="#05031A"></path>
+                    <path d="M25,29 L30,29 L30,33 L25,33 L25,29 Z M25,42 L30,42 L30,46 L25,46 L25,42 Z M25,55 L30,55 L30,59 L25,59 L25,55 Z" id="ic" fill="#05031A"></path>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

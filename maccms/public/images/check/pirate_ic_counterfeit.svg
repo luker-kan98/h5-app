@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="80px" height="80px" viewBox="0 0 80 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>pirate_ic_counterfeit@2x</title>
+    <defs>
+        <filter x="-58.7%" y="-58.7%" width="217.3%" height="217.3%" filterUnits="objectBoundingBox" id="filter-1">
+            <feGaussianBlur stdDeviation="8.8" in="SourceGraphic"></feGaussianBlur>
+        </filter>
+    </defs>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="盗版检测" transform="translate(-433.000000, -771.000000)">
+            <g id="pirate_ic_counterfeit" transform="translate(433.000000, 771.000000)">
+                <rect id="矩形" x="0" y="0" width="80" height="80"></rect>
+                <g id="编组-9" transform="translate(10.000000, 10.000000)">
+                    <g id="编组-10">
+                        <circle id="椭圆形" stroke="#40CC92" stroke-width="2" fill-opacity="0.3" fill="#40CC92" cx="13" cy="13" r="12"></circle>
+                        <g id="编组-5" transform="translate(11.500000, 12.255296) rotate(-315.000000) translate(-11.500000, -12.255296) translate(4.717357, 5.472654)"></g>
+                    </g>
+                    <line x1="9" y1="9" x2="17" y2="17" id="路径-2" stroke="#40CC92" stroke-width="2"></line>
+                    <line x1="17" y1="9" x2="9" y2="17" id="路径-2" stroke="#40CC92" stroke-width="2"></line>
+                </g>
+                <rect id="矩形" fill="#5BCF9F" opacity="0.2" filter="url(#filter-1)" x="18" y="17" width="45" height="45" rx="22.5"></rect>
+                <rect id="矩形" fill="#FFFFFF" x="17" y="19" width="51" height="51" rx="25.5"></rect>
+                <g id="编组" transform="translate(25.625000, 40.000000)" fill="#323643" fill-rule="nonzero">
+                    <polygon id="路径" points="30.9533522 0 29.6064204 3.71999999 28.6230682 0.099 25.7619886 0.099 24.7801705 3.71999999 23.4317045 0 20.6350568 0 19.288125 3.71999999 18.3063068 0.099 15.4452273 0.099 14.461875 3.71999999 13.1149432 0 10.3182955 0 8.96982954 3.71999999 7.98801135 0.099 5.12693182 0.099 4.14511362 3.71999999 2.79511365 0 0 0.8595 2.94852271 9 5.77585227 8.89949999 6.55823863 6.02399999 7.33755683 8.89949999 10.1664205 9 11.7158523 4.7205 13.2652841 9 16.0941477 8.89949999 16.875 6.02399999 17.6558523 8.89949999 20.4847159 9 22.0341477 4.7205 23.5835795 9 26.4124432 8.89949999 27.1917614 6.02399999 27.9741477 8.89949999 30.8014772 9 33.75 0.8595"></polygon>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>
