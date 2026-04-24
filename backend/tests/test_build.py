@@ -88,7 +88,7 @@ def test_submit_build_multiple_platforms(client, auth_headers, tmp_path, db):
         resp = client.post(
             "/build",
             data={
-                "h5_url": "https://example.com",
+                "h5_url": "https://multi-platform.example.com",
                 "platforms": ["android", "ios"],
                 "app_name": "Example App",
                 "android_package_name": "com.example.app",
@@ -118,7 +118,7 @@ def test_submit_build_with_keystore(client, auth_headers, tmp_path, db):
         resp = client.post(
             "/build",
             data={
-                **_build_form_data(),
+                **_build_form_data(h5_url="https://keystore.example.com"),
                 "keystore_password": "secret",
                 "key_alias": "myalias",
                 "key_password": "keypass",
@@ -141,7 +141,7 @@ def test_submit_build_rejects_empty_keystore(client, auth_headers, tmp_path):
     with patch("app.api.build.BUILDS_DIR", str(tmp_path)):
         resp = client.post(
             "/build",
-            data=_build_form_data(),
+            data=_build_form_data(h5_url="https://empty-ks.example.com"),
             files=_build_files(
                 keystore_file=("empty.jks", io.BytesIO(b""), "application/octet-stream"),
             ),
@@ -154,7 +154,7 @@ def test_submit_build_rejects_oversized_keystore(client, auth_headers, tmp_path)
     with patch("app.api.build.BUILDS_DIR", str(tmp_path)):
         resp = client.post(
             "/build",
-            data=_build_form_data(),
+            data=_build_form_data(h5_url="https://big-ks.example.com"),
             files=_build_files(
                 keystore_file=("big.jks", io.BytesIO(b"x" * (1_048_576 + 1)), "application/octet-stream"),
             ),
@@ -167,7 +167,7 @@ def test_submit_build_rejects_non_png_icon(client, auth_headers, tmp_path):
     with patch("app.api.build.BUILDS_DIR", str(tmp_path)):
         resp = client.post(
             "/build",
-            data=_build_form_data(),
+            data=_build_form_data(h5_url="https://non-png.example.com"),
             files=_build_files(
                 icon_stream=_png_bytes(format="JPEG"),
                 icon_name="icon.jpg",
@@ -183,7 +183,7 @@ def test_submit_build_rejects_non_square_icon(client, auth_headers, tmp_path):
     with patch("app.api.build.BUILDS_DIR", str(tmp_path)):
         resp = client.post(
             "/build",
-            data=_build_form_data(),
+            data=_build_form_data(h5_url="https://non-square.example.com"),
             files=_build_files(icon_stream=_png_bytes(size=(1024, 768))),
             headers=auth_headers,
         )
@@ -195,7 +195,7 @@ def test_submit_build_rejects_small_icon(client, auth_headers, tmp_path):
     with patch("app.api.build.BUILDS_DIR", str(tmp_path)):
         resp = client.post(
             "/build",
-            data=_build_form_data(),
+            data=_build_form_data(h5_url="https://small-icon.example.com"),
             files=_build_files(icon_stream=_png_bytes(size=(512, 512))),
             headers=auth_headers,
         )
@@ -207,7 +207,7 @@ def test_submit_build_rejects_missing_android_package(client, auth_headers, tmp_
     with patch("app.api.build.BUILDS_DIR", str(tmp_path)):
         resp = client.post(
             "/build",
-            data=_build_form_data(android_package_name=""),
+            data=_build_form_data(h5_url="https://no-pkg.example.com", android_package_name=""),
             files=_build_files(),
             headers=auth_headers,
         )
@@ -219,7 +219,7 @@ def test_submit_build_rejects_invalid_android_package(client, auth_headers, tmp_
     with patch("app.api.build.BUILDS_DIR", str(tmp_path)):
         resp = client.post(
             "/build",
-            data=_build_form_data(android_package_name="com.Example.app"),
+            data=_build_form_data(h5_url="https://bad-pkg.example.com", android_package_name="com.Example.app"),
             files=_build_files(),
             headers=auth_headers,
         )
@@ -242,7 +242,7 @@ def test_submit_build_rejects_invalid_platform(client, auth_headers, tmp_path):
     with patch("app.api.build.BUILDS_DIR", str(tmp_path)):
         resp = client.post(
             "/build",
-            data=_build_form_data(platforms="dos"),
+            data=_build_form_data(h5_url="https://bad-platform.example.com", platforms="dos"),
             files=_build_files(),
             headers=auth_headers,
         )
@@ -335,3 +335,28 @@ def test_download_file_redirects_to_s3_url(client, auth_headers, db):
     assert resp.headers["location"] == (
         "https://macosbuckets3.s3.ap-east-1.amazonaws.com/uploads/request-s3-download/android.apk"
     )
+
+
+def test_submit_build_rejects_duplicate_url(client, auth_headers, tmp_path):
+    url = "https://duplicate-test.example.com"
+    with patch("app.api.build.BUILDS_DIR", str(tmp_path)), \
+         patch("app.api.build.run_scheduler_once", return_value={"promoted": 0, "dispatched": 0}), \
+         patch("app.api.build.refresh_request_status", return_value="submitted"), \
+         patch("app.api.build.estimate_request_wait_seconds", return_value=0):
+        resp1 = client.post(
+            "/build",
+            data=_build_form_data(h5_url=url),
+            files=_build_files(),
+            headers=auth_headers,
+        )
+    assert resp1.status_code == 200
+
+    with patch("app.api.build.BUILDS_DIR", str(tmp_path)):
+        resp2 = client.post(
+            "/build",
+            data=_build_form_data(h5_url=url),
+            files=_build_files(),
+            headers=auth_headers,
+        )
+    assert resp2.status_code == 409
+    assert "已提交过打包" in resp2.json()["detail"]

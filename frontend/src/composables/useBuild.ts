@@ -48,5 +48,19 @@ export function useBuild() {
     return data
   }
 
-  return { loading, error, submitBuild, getStatus, getHistory }
+  async function rebuildBuild(requestId: string): Promise<string> {
+    loading.value = true
+    error.value = null
+    try {
+      const { data } = await client.post(`/rebuild/${requestId}`)
+      return data.task_id
+    } catch (e: any) {
+      error.value = e.response?.data?.detail ?? 'Rebuild failed'
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
+  return { loading, error, submitBuild, getStatus, getHistory, rebuildBuild }
 }
