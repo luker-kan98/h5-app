@@ -107,7 +107,11 @@ const ApiSidebar = ({ currentElementIndexInViewport }) => {
               <Link href={`#用户接口`}
                     className="group-hover:text-primary text-[16px]">{t("apis.wd.s14")}</Link>
             </li>
-
+            <li className={clsx("doc-menu-subitem group", currentElementIndexInViewport == 14 && "active")}>
+              <div className="marker group-hover:border-primary"/>
+              <Link href={`#AI对话搜索`}
+                    className="group-hover:text-primary text-[16px]">{t("apis.wd.s96")}</Link>
+            </li>
           </>
         }
       </ul>

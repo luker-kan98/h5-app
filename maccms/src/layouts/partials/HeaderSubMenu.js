@@ -94,11 +94,11 @@ const HeaderWithSubMenu = ({ mobile_title, children }) => {
       >
         <nav className={clsx("navbar nav-container")}>
           {/* logo */}
-          <div className={clsx("order-0 hidden md:block")} onClick={() => setShowMenu(false)}>
+          <div className={clsx("order-0 hidden shrink-0 md:block")} onClick={() => setShowMenu(false)}>
             <Logo src={logo} lang={locale} />
           </div>
           {/* logo mobile */}
-          <div className={clsx("order-0 md:hidden", !showMenu && !showSubMenu && "hidden")} onClick={() => setShowMenu(false)}>
+          <div className={clsx("order-0 shrink-0 md:hidden", !showMenu && !showSubMenu && "hidden")} onClick={() => setShowMenu(false)}>
             <Logo src={logo} lang={locale} />
           </div>
 
@@ -122,11 +122,12 @@ const HeaderWithSubMenu = ({ mobile_title, children }) => {
             <span className="font-medium text-black text-[18px]">{mobile_title}</span>
           </div>
 
-          {/* Main menu */}
-          <DesktopMenu />
-          
+          <div className="order-2 hidden min-w-0 flex-1 justify-end overflow-visible md:flex">
+            <DesktopMenu />
+          </div>
+
           {/* Mobile menu toggler */}
-          <div className="flex items-center order-1 md:ml-0">
+          <div className="order-1 flex shrink-0 items-center md:ml-0">
             {/* navbar toggler */}
             {showMenu || showSubMenu ? (
               <button

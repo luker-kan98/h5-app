@@ -1,9 +1,13 @@
 import { useTranslation } from "react-i18next";
 import { markdownify } from "@/lib/utils/textConverter";
 import Base from "@/layouts/BaseLayout";
-import Image from "next/image";
 import Link from "next/link";
 import Advertise from "@/layouts/components/home/Advertise";
+import H5PackBar from "@/layouts/components/home/H5PackBar";
+import HomeAiHighlights from "@/layouts/components/home/HomeAiHighlights";
+import HomeAiShowcase from "@/layouts/components/home/HomeAiShowcase";
+import HomeGrowthSection from "@/layouts/components/home/HomeGrowthSection";
+import HomeFunctionDeck from "@/layouts/components/home/HomeFunctionDeck";
 import Footer from "@/layouts/partials/Footer";
 
 export default function Home() {
@@ -11,20 +15,48 @@ export default function Home() {
 
   return (
     <Base title={t('seo.index.title')} description={t('seo.index.description')} keywords={t('seo.index.keywords')}>
-      <section>
-        <div className="container pt-[35px] md:pt-[90px] xl:pt-[150px]">
-          {/* banner title */}
-          <div className="flex flex-wrap">
-            {markdownify(t("home.s1"), "h1", "")}
-            {markdownify(t("home.s2"), "h1", "")}
-          </div>
-          {/* banner subtitle */}
-          {markdownify(t("home.s3"), "p", "text-text text-[17px] md:text-[24px] pt-5 md:pt-[18px]")}
-          {/* description */}
-          {markdownify(t("home.s4"), "p", "opacity-50 pt-5 md:pt-4")}
+      <section className="relative -mt-[50px] overflow-hidden bg-white pt-[50px] md:-mt-[60px] md:pt-[60px]">
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background: "linear-gradient(180deg, #dff7ef 0%, #eefbf6 34%, #ffffff 100%)",
+          }}
+          aria-hidden
+        />
+        <div className="container relative pt-[35px] md:pt-[90px] xl:pt-[150px]">
+          {/* banner title: robot + black lead + green accent + AI badge (per locale) */}
+          <h1 className="flex flex-wrap items-center gap-x-2 gap-y-2 text-[26px] font-bold leading-tight tracking-tight text-dark md:gap-x-3 md:text-[40px] md:leading-tight">
+            <img
+              src="/images/branding/robot-mascot.png"
+              srcSet="/images/branding/robot-mascot.png 1x, /images/branding/robot-mascot@2x.png 2x"
+              width={48}
+              height={48}
+              alt=""
+              fetchPriority="high"
+              decoding="async"
+              className="h-10 w-10 shrink-0 rounded-full object-cover md:h-12 md:w-12"
+              aria-hidden
+            />
+            <span className="break-keep">{t("home.bannerBlack")}</span>
+            <span className="break-keep text-primary">{t("home.bannerGreen")}</span>
+            <span className="inline-flex shrink-0 items-center justify-center rounded-full bg-[#DCF5E8] px-3 py-1.5 text-sm font-semibold leading-tight text-[#16a34a] md:px-4 md:py-2 md:text-lg">
+              {t("menu.aibadge")}
+            </span>
+          </h1>
+          {/* banner subtitle: lead + supporting copy */}
+          {markdownify(
+            t("home.s3"),
+            "p",
+            "max-w-4xl pt-5 text-[17px] font-medium leading-snug text-[#4b5563] md:pt-[18px] md:text-[22px] md:leading-snug"
+          )}
+          {markdownify(
+            t("home.s4"),
+            "p",
+            "max-w-4xl pt-3 text-[14px] leading-relaxed text-[#6b7280] md:pt-4 md:text-base md:leading-relaxed"
+          )}
 
           {/* download link */}
-          <div className="mt-[35px] md:mt-[120px] md:h-[220px] flex flex-col md:flex-row items-end md:gap-x-5 gap-y-4">
+          <div className="mt-8 md:mt-14 md:h-[220px] flex flex-col md:flex-row items-end md:gap-x-5 gap-y-4">
             <div className="relative banner-download group">
               <Link href="https://www.maccms.la/down/maccms10.zip" className="banner-download-icon-cover">
                 <div className="download-icon"></div>
@@ -44,12 +76,29 @@ export default function Home() {
               <span className="download-text">{t('home.s29')}</span>
             </div>
           </div>
+
+          <div className="mt-6 md:mt-8">
+            <H5PackBar />
+          </div>
+
+          <HomeAiHighlights />
         </div>
       </section>
+
+      <HomeAiShowcase />
+
       <section>
         <div className="container">
-          {/* Ads */}
+          {/* Product advantages (s8 + feature grid) */}
           <Advertise />
+        </div>
+      </section>
+
+      <HomeGrowthSection />
+
+      <section>
+        <div className="container">
+          <HomeFunctionDeck />
           {/* thanks */}
           <div className="w-full flex flex-col mt-[35px] md:mt-[150px] mb-[60px] md:mb-[90px] items-center gap-[16px]">
             <Link href="https://github.com/magicblack" target="_blank" className="ads-thanks group">

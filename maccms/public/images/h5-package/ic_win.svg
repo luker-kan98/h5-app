@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="36px" height="36px" viewBox="0 0 36 36" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>ic_win@2x</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="H5封包app" transform="translate(-1163.000000, -364.000000)">
+            <g id="编组-8" transform="translate(596.000000, 280.000000)">
+                <g id="编组-7" transform="translate(24.000000, 80.000000)">
+                    <g id="编组-2" transform="translate(499.000000, 0.000000)">
+                        <g id="ic_win" transform="translate(44.000000, 4.000000)">
+                            <rect id="矩形备份-27" x="0" y="0" width="36" height="36" rx="8"></rect>
+                            <path d="M18,10.4704971 L18,17.1818182 L27,17.1818182 L27,9 L18,10.4704971 Z M18,25.5542355 L27,27 L27,18.8181818 L18,18.8181818 L18,25.5542355 Z M9,17.1818182 L16.3636364,17.1818182 L16.3636364,11.4545455 L9,12.5555483 L9,17.1818182 Z M9,23.467235 L16.3636364,24.5454545 L16.3636364,18.8181818 L9,18.8181818 L9,23.467235 Z" id="形状" fill="#05031A"></path>
+                        </g>
+                    </g>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

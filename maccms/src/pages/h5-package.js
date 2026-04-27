@@ -20,25 +20,25 @@ const PLATFORMS = [
     key: "android",
     label: "安卓",
     statusLabel: "Android",
-    icon: "/images/h5-package/android-icon.png",
+    icon: "/images/h5-package/ic_android.svg",
   },
   {
     key: "ios",
     label: "iOS (未签名)",
     statusLabel: "iOS (未签名)",
-    icon: "/images/h5-package/ios-icon.png",
+    icon: "/images/h5-package/ic_apple.svg",
   },
   {
     key: "macos",
     label: "macOS",
     statusLabel: "macOS",
-    icon: "/images/h5-package/macos-icon.png",
+    icon: "/images/h5-package/ic_macos.svg",
   },
   {
     key: "windows",
     label: "Windows",
     statusLabel: "Windows",
-    icon: "/images/h5-package/windows-icon.png",
+    icon: "/images/h5-package/ic_win.svg",
   },
 ];
 
@@ -591,33 +591,31 @@ function FormView({
                   : "rgba(245,248,249,1)",
               }}
             >
-              <span
-                className="inline-flex items-center justify-center w-[18px] h-[18px] md:w-[22px] md:h-[22px] rounded border"
-                style={{
-                  borderWidth: active ? "2px" : "1px",
-                  borderColor: active
-                    ? "rgba(64,204,146,1)"
-                    : "rgba(151,151,151,1)",
-                  backgroundColor: active
-                    ? "rgba(64,204,146,0.2)"
-                    : "transparent",
-                }}
-              >
-                {active ? (
-                  <Image
-                    src="/images/h5-package/check.png"
-                    alt=""
-                    width={8}
-                    height={5}
-                  />
-                ) : null}
-              </span>
+              {active ? (
+                <Image
+                  src="/images/h5-package/cb_ic_sel.svg"
+                  alt=""
+                  width={20}
+                  height={20}
+                  className="w-[18px] h-[18px] md:w-[20px] md:h-[20px]"
+                />
+              ) : (
+                <span
+                  className="inline-flex items-center justify-center w-[18px] h-[18px] md:w-[20px] md:h-[20px] rounded border"
+                  style={{
+                    borderWidth: "1px",
+                    borderColor: "rgba(151,151,151,1)",
+                    backgroundColor: "transparent",
+                  }}
+                />
+              )}
               <span className="inline-flex items-center justify-center w-8 h-8 md:w-9 md:h-9 rounded-lg">
                 <Image
                   src={platform.icon}
                   alt={platform.label}
-                  width={20}
-                  height={20}
+                  width={36}
+                  height={36}
+                  className="w-[28px] h-[28px] md:w-[36px] md:h-[36px]"
                 />
               </span>
               <span className="text-[12px] md:text-[14px] text-dark whitespace-nowrap pr-1.5 md:pr-2">
@@ -828,8 +826,9 @@ function TaskPlatformRow({
           <Image
             src={platform.icon}
             alt={platform.statusLabel}
-            width={20}
-            height={20}
+            width={36}
+            height={36}
+            className="w-[24px] h-[24px] md:w-[28px] md:h-[28px]"
           />
         ) : null}
 

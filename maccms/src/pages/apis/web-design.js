@@ -31,6 +31,8 @@ export default function ApiPage() {
     useRef(null),
     useRef(null),
     useRef(null),
+    useRef(null),
+    useRef(null),
     useRef(null)
   ];
 
@@ -51,6 +53,68 @@ export default function ApiPage() {
               <article className="doc pt-[10px] md:pt-[35px] grow">
                 <div ref={sectionRefs[0]} className="w-full">
                   <h2>{t("apis.wd.s1")}</h2>
+                  <h3>{t("apis.wd.s155")}</h3>
+                  <h4>{t("apis.wd.s110")}</h4>
+                  <ul className="list">
+                    <li>{t("apis.wd.s119")}</li>
+                    <li>{t("apis.wd.s120")}</li>
+                    <li>{t("apis.wd.s121")}</li>
+                    <li>{t("apis.wd.s122")}</li>
+                  </ul>
+
+                  <h4>{t("apis.wd.s111")}</h4>
+                  <ul className="list">
+                    <li>{t("apis.wd.s124")}</li>
+                    <li>{t("apis.wd.s125")}</li>
+                    <li>{t("apis.wd.s126")}</li>
+                    <li>{t("apis.wd.s123")}</li>
+                    <li>{t("apis.wd.s127")}</li>
+                  </ul>
+
+                  <h4>{t("apis.wd.s112")}</h4>
+                  <ul className="list">
+                    <li>{t("apis.wd.s128")}</li>
+                    <li>{t("apis.wd.s129")}</li>
+                    <li>{t("apis.wd.s133")}</li>
+                    <li>{t("apis.wd.s130")}</li>
+                    <li>{t("apis.wd.s131")}</li>
+                    <li>{t("apis.wd.s132")}</li>
+                    <li>{t("apis.wd.s134")}</li>
+                  </ul>
+                  <InlineCode type={"text"} lines={7} code={t("apis.wd.s135")} />
+
+                  <h4>{t("apis.wd.s113")}</h4>
+                  <ul className="list">
+                    <li>{t("apis.wd.s137")}</li>
+                    <li>{t("apis.wd.s136")}</li>
+                    <li>{t("apis.wd.s138")}</li>
+                    <li>{t("apis.wd.s139")}</li>
+                  </ul>
+                  <p>{t("apis.wd.s140")}</p>
+
+                  <h4>{t("apis.wd.s114")}</h4>
+                  <ul className="list">
+                    <li>{t("apis.wd.s141")}</li>
+                    <li>{t("apis.wd.s142")}</li>
+                    <li>{t("apis.wd.s143")}</li>
+                    <li>{t("apis.wd.s144")}</li>
+                  </ul>
+
+                  <h4>{t("apis.wd.s115")}</h4>
+                  <ul className="list">
+                    <li>{t("apis.wd.s146")}</li>
+                    <li>{t("apis.wd.s145")}</li>
+                    <li>{t("apis.wd.s147")}</li>
+                    <li>{t("apis.wd.s148")}</li>
+                  </ul>
+
+                  <h4>{t("apis.wd.s116")}</h4>
+                  <ul className="list">
+                    <li>{t("apis.wd.s149")}</li>
+                    <li>{t("apis.wd.s150")}</li>
+                    <li>{t("apis.wd.s151")}</li>
+                    <li>{t("apis.wd.s152")}</li>
+                  </ul>
                 </div>
 
                 <div id={'数据接口'} ref={sectionRefs[1]} className={'w-full'}>
@@ -974,6 +1038,71 @@ Bing-SiteMap  /api.php/timming/make/param/ac=rss&ac2=bing
 \t"msg": "头像上传成功",
    "file":"upload/user/4/4.jpg"
 }`} />
+                </div>
+
+                <div id={'AI对话搜索'} ref={sectionRefs[14]} className={'w-full'}>
+                  <h3>{t('apis.wd.s96')}</h3>
+                  <p>{t('apis.wd.s97')}</p>
+                  <ul className='list'>
+                    {markdownify(t('apis.wd.s98'), 'li')}
+                    {markdownify(t('apis.wd.s99'), 'li')}
+                    {markdownify(t('apis.wd.s100'), 'li')}
+                  </ul>
+                  <div className='table-wrapper'>
+                    <table>
+                      <thead className='thead'>
+                      <tr>
+                        <th>参数</th>
+                        <th>示例值</th>
+                        <th>是否必填</th>
+                        <th>参数描述</th>
+                      </tr>
+                      </thead>
+                      <tbody>
+                      <tr>
+                        <td>question</td>
+                        <td>推荐几部最近更新的动作片</td>
+                        <td>必填</td>
+                        <td>用户提问内容，长度受后台配置限制</td>
+                      </tr>
+                      <tr>
+                        <td>mid</td>
+                        <td>1</td>
+                        <td>选填</td>
+                        <td>模型筛选，支持 0,1,2,3,8,9,11,12；不传默认全模型</td>
+                      </tr>
+                      <tr>
+                        <td>limit</td>
+                        <td>6</td>
+                        <td>选填</td>
+                        <td>返回条数，范围 1-12</td>
+                      </tr>
+                      <tr>
+                        <td>__token__</td>
+                        <td>csrf_token</td>
+                        <td>必填</td>
+                        <td>页面会话 token（需和 session 中 token 一致）</td>
+                      </tr>
+                    </tbody>
+                    </table>
+                  </div>
+                  <strong>{t('apis.wd.s101')}</strong>
+                  <InlineCode type={'json'} lines={16} code={`{
+\t"code": 1,
+\t"msg": "ok",
+\t"data": {
+\t\t"answer": "这里是AI生成的摘要结果...",
+\t\t"list": [
+\t\t\t{
+\t\t\t\t"id": 1001,
+\t\t\t\t"name": "示例影片",
+\t\t\t\t"url": "/voddetail/1001.html"
+\t\t\t}
+\t\t],
+\t\t"session_id": "chat_1710000000",
+\t\t"retry_after": 0
+\t}
+}`}/>
                 </div>
 
                 {/* Page */}

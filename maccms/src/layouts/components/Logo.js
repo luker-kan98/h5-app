@@ -10,16 +10,21 @@ const Logo = ({ src, lang }) => {
 
   return (
     <Link href={`/`} className="block navbar-brand">
-      <div className="flex flex-row items-center h-[48px] md:h-[60px]">
+      <div className="flex flex-row items-center gap-2 h-[48px] md:h-[60px]">
         <ImageFallback
           width={width}
           height={height}
           src={src ? src : logo}
           alt={logo_title}
           priority
-          className={`w-[36px] h-[36px] md:w-[50px] md:h-[50px]`}
+          className={`w-[36px] h-[36px] md:w-[50px] md:h-[50px] shrink-0 self-center`}
         />
-        <label className="ml-[6px] md:ml-[10px] text-[18px] md:text-[24px] text-dark pt-[6px] md:pt-[8px] font-medium break-keep">{t("menu.logo")}</label>
+        <span className="ml-[2px] md:ml-[2px] text-[18px] md:text-[24px] text-dark font-medium break-keep leading-none self-center">
+          {t("menu.logo")}
+        </span>
+        <span className="inline-flex shrink-0 items-center justify-center self-center rounded-full bg-[#DCF5E8] px-2.5 py-1 text-xs font-semibold leading-tight text-[#16a34a] md:px-3 md:py-1.5 md:text-sm">
+          {t("menu.aibadge")}
+        </span>
       </div>
     </Link>
   );

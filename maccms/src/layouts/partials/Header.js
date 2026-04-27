@@ -56,14 +56,15 @@ const Header = () => {
       >
         <nav className={clsx("navbar nav-container")}>
           {/* logo */}
-          <div className="order-0" onClick={() => setShowMenu(false)}>
+          <div className="order-0 shrink-0" onClick={() => setShowMenu(false)}>
             <Logo src={logo} lang={locale} />
           </div>
 
-          {/* Desktop menu */}
-          <DesktopMenu />
-          
-          <div className="flex items-center order-1 md:ml-0">
+          <div className="order-2 hidden min-w-0 flex-1 justify-end overflow-visible md:flex">
+            <DesktopMenu />
+          </div>
+
+          <div className="order-1 flex shrink-0 items-center md:ml-0">
             {/* navbar toggler */}
             {showMenu ? (
               <button

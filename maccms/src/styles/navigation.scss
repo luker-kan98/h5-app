@@ -20,11 +20,11 @@
 
 // navbar items
 .navbar {
-  @apply relative h-[48px] md:h-[60px] flex flex-row items-center justify-between lg:items-start font-primary;
+  @apply relative flex h-[48px] w-full min-w-0 max-w-full flex-row flex-nowrap items-center justify-between font-primary md:h-[60px];
 }
 
 .nav-container {
-  @apply px-4 md:mx-auto max-w-[1300px] md:px-5 flex items-center;
+  @apply mx-auto flex w-full min-w-0 max-w-[1300px] items-center px-3 sm:px-4 md:px-5;
 }
 
 .navbar-brand {
@@ -123,7 +123,7 @@
 }
 
 .navbar .menu-items {
-  @apply hidden md:flex flex-wrap items-center justify-end flex-shrink h-[50px] gap-[10px];
+  @apply hidden min-w-0 shrink md:flex md:flex-nowrap md:items-center md:justify-end md:gap-x-0;
 }
 
 .navbar ul li {
@@ -159,12 +159,11 @@
   background: white;
   min-width: 100px;
   max-width: 300px;
-  padding: 5px 0px;
+  padding: 6px 0px;
   line-height: 30px;
   box-shadow: 0px 4px 20px 0px #F1F1F1;
   border-radius: 8px;
   border: 1px solid #E6E6E6;
-  top: 50px;
   z-index: 90;
   opacity: 0;
   visibility: hidden;
@@ -179,10 +178,12 @@
 }
 .navbar .dropdown-menu {
   @apply right-0 left-auto;
+  top: calc(100% + 6px);
 }
 
 .navbar .menu-item {
-  @apply flex flex-row items-center justify-start gap-1 py-[5px] px-2 lg:px-[10px] text-[#626174] whitespace-nowrap cursor-pointer hover:text-primary text-base leading-normal;
+  @apply flex cursor-pointer flex-row items-center justify-start gap-0.5 py-1.5 px-1.5 text-[13px] leading-tight text-[#626174] hover:text-primary sm:px-2 md:px-2 md:text-sm lg:text-[15px];
+  @apply whitespace-nowrap;
   &.active {
     @apply font-[500] text-primary;
   }
@@ -270,7 +271,7 @@
 }
 
 .nav-splitter {
-  @apply w-[1px] h-[12px] bg-[#D9E6E7];
+  @apply mx-0.5 h-3 w-px shrink-0 bg-[#D9E6E7] sm:mx-1 md:h-3.5;
 }
 
 .nav-search {
