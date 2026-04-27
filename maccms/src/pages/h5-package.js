@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import clsx from "clsx";
+import { useTranslation } from "react-i18next";
 import Base from "@/layouts/BaseLayout";
 import Footer from "@/layouts/partials/Footer";
 import {
@@ -15,70 +16,53 @@ const BUILD_POLL_INTERVAL_MS = 3000;
 const ANDROID_PACKAGE_RE = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;
 const TERMINAL_PLATFORM_STATUSES = new Set(["done", "failed", "cancelled"]);
 
-const PLATFORMS = [
-  {
-    key: "android",
-    label: "安卓",
-    statusLabel: "Android",
-    icon: "/images/h5-package/ic_android.svg",
-  },
-  {
-    key: "ios",
-    label: "iOS (未签名)",
-    statusLabel: "iOS (未签名)",
-    icon: "/images/h5-package/ic_apple.svg",
-  },
-  {
-    key: "macos",
-    label: "macOS",
-    statusLabel: "macOS",
-    icon: "/images/h5-package/ic_macos.svg",
-  },
-  {
-    key: "windows",
-    label: "Windows",
-    statusLabel: "Windows",
-    icon: "/images/h5-package/ic_win.svg",
-  },
-];
+const PLATFORM_KEYS = ["android", "ios", "macos", "windows"];
+const PLATFORM_ICONS = {
+  android: "/images/h5-package/android-icon.png",
+  ios: "/images/h5-package/ios-icon.png",
+  macos: "/images/h5-package/macos-icon.png",
+  windows: "/images/h5-package/windows-icon.png",
+};
 
-const FEATURES = [
+const FEATURE_DEFS = [
   {
     image: "/images/h5-package/android-card.png",
-    title: "安卓端 打包",
-    desc: "快速生成安卓原生APP，完美适配全机型，无需安卓原生编程，网站 / H5 网页直接打包，助力快速布局安卓移动端！",
+    titleKey: "h5p.feature.androidTitle",
+    descKey: "h5p.feature.androidDesc",
   },
   {
     image: "/images/h5-package/ios-card.png",
-    title: "iOS端 打包",
-    desc: "一键生成苹果 iOS 应用，无需苹果原生编程，同时支持安卓 & iOS 双端打包，快速迭代兼容，协助上架 App Store！",
+    titleKey: "h5p.feature.iosTitle",
+    descKey: "h5p.feature.iosDesc",
   },
   {
     image: "/images/h5-package/macos-card.png",
-    title: "macOS端 打包",
-    desc: "网站 / H5 直接打包苹果电脑桌面应用，无需懂 macOS 开发，自主操作自助配置，草根站长也能快速做桌面应用！",
+    titleKey: "h5p.feature.macosTitle",
+    descKey: "h5p.feature.macosDesc",
   },
   {
     image: "/images/h5-package/windows-card.png",
-    title: "Windows端 打包",
-    desc: "网页 / H5 一键打包 Windows 桌面应用，无需原生编程，快速生成适配 Windows 系统的桌面 APP，玩转多端布局！",
+    titleKey: "h5p.feature.windowsTitle",
+    descKey: "h5p.feature.windowsDesc",
   },
 ];
-
-const QUEUE_STATUS_LABELS = {
-  submitted: "已提交",
-  waiting_capacity: "等待资源",
-  queued: "排队中",
-  running: "打包中",
-  done: "已完成",
-  failed: "已结束",
-};
 
 const REVEAL_COLLAPSED = "max-h-0 opacity-0 pointer-events-none";
 const REVEAL_EXPANDED = "max-h-[400px] opacity-100";
 const TRANSITION = "transition-all duration-500 ease-out overflow-hidden";
 
-const platformByKey = (key) => PLATFORMS.find((platform) => platform.key === key);
+const buildPlatforms = (t) =>
+  PLATFORM_KEYS.map((key) => ({
+    key,
+    label: t(`h5p.platform.${key}`),
+    statusLabel:
+      key === "android"
+        ? t("h5p.platform.androidStatus")
+        : key === "ios"
+          ? t("h5p.platform.iosStatus")
+          : t(`h5p.platform.${key}`),
+    icon: PLATFORM_ICONS[key],
+  }));
 
 const isTerminalBuild = (job) => {
   const statuses = Object.values(job?.platforms ?? {}).map(
@@ -87,12 +71,24 @@ const isTerminalBuild = (job) => {
   return statuses.length > 0 && statuses.every((status) => TERMINAL_PLATFORM_STATUSES.has(status));
 };
 
-const formatQueueStatus = (status) => QUEUE_STATUS_LABELS[status] ?? status ?? "未知状态";
+const formatQueueStatus = (t, status) => {
+  if (!status) {
+    return t("h5p.queueStatus.unknown");
+  }
+  const key = `h5p.queueStatus.${status}`;
+  const translated = t(key);
+  return translated === key ? status : translated;
+};
 
-const formatPlatformList = (platforms = []) =>
-  platforms
-    .map((platform) => platformByKey(platform)?.label ?? platform)
+const formatPlatformList = (t, platforms = []) => {
+  const platformMap = buildPlatforms(t);
+  return platforms
+    .map(
+      (platform) =>
+        platformMap.find((entry) => entry.key === platform)?.label ?? platform,
+    )
     .join(" / ");
+};
 
 const formatDateTime = (value) => {
   if (!value) {
@@ -104,7 +100,7 @@ const formatDateTime = (value) => {
     return String(value);
   }
 
-  return date.toLocaleString("zh-CN", {
+  return date.toLocaleString(undefined, {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -115,24 +111,27 @@ const formatDateTime = (value) => {
   });
 };
 
-const formatWaitTime = (seconds) => {
+const formatWaitTime = (t, seconds) => {
   if (!seconds || seconds <= 0) {
     return "";
   }
 
   if (seconds < 60) {
-    return `${seconds} 秒`;
+    return t("h5p.wait.seconds", { value: seconds });
   }
 
   const minutes = Math.floor(seconds / 60);
   const remainder = seconds % 60;
   if (remainder === 0) {
-    return `${minutes} 分钟`;
+    return t("h5p.wait.minutes", { value: minutes });
   }
-  return `${minutes} 分 ${remainder} 秒`;
+  return t("h5p.wait.minutesSeconds", { minutes, seconds: remainder });
 };
 
 export default function H5Package() {
+  const { t } = useTranslation();
+  const platforms = useMemo(() => buildPlatforms(t), [t]);
+
   const [view, setView] = useState("idle");
 
   const [url, setUrl] = useState("");
@@ -195,7 +194,7 @@ export default function H5Package() {
           return;
         }
 
-        setTaskError(getApiErrorMessage(error, "获取打包状态失败"));
+        setTaskError(getApiErrorMessage(error, t("h5p.error.statusFail")));
       } finally {
         if (active && !silent) {
           setTaskLoading(false);
@@ -211,7 +210,7 @@ export default function H5Package() {
         window.clearTimeout(timerId);
       }
     };
-  }, [view, currentTaskId]);
+  }, [view, currentTaskId, t]);
 
   const onFileChange = (event) => {
     const file = event.target.files?.[0] ?? null;
@@ -236,7 +235,7 @@ export default function H5Package() {
       const data = await fetchBuildHistory();
       setHistory(Array.isArray(data) ? data : []);
     } catch (error) {
-      setHistoryError(getApiErrorMessage(error, "获取历史记录失败"));
+      setHistoryError(getApiErrorMessage(error, t("h5p.error.historyFail")));
     } finally {
       setHistoryLoading(false);
     }
@@ -255,33 +254,33 @@ export default function H5Package() {
     const trimmedPkg = pkg.trim();
 
     if (!trimmedUrl) {
-      setFormError("H5 网址不能为空");
+      setFormError(t("h5p.error.urlRequired"));
       return;
     }
     if (!trimmedName) {
-      setFormError("App 名称不能为空");
+      setFormError(t("h5p.error.appNameRequired"));
       return;
     }
     if (!selected.length) {
-      setFormError("请至少选择一个目标平台");
+      setFormError(t("h5p.error.platformRequired"));
       return;
     }
     if (!iconFile) {
-      setFormError("请上传 App 图标");
+      setFormError(t("h5p.error.iconRequired"));
       return;
     }
     if (isAndroidSelected && !trimmedPkg) {
-      setFormError("请选择安卓平台时请填写 Android 包名");
+      setFormError(t("h5p.error.androidPkgRequired"));
       return;
     }
     if (trimmedPkg && !ANDROID_PACKAGE_RE.test(trimmedPkg)) {
-      setFormError("Android 包名格式应类似 com.example.app");
+      setFormError(t("h5p.error.androidPkgFormat"));
       return;
     }
 
-    const iconError = await validateIcon(iconFile);
-    if (iconError) {
-      setFormError(iconError);
+    const iconErrorKey = await validateIcon(iconFile);
+    if (iconErrorKey) {
+      setFormError(t(iconErrorKey));
       return;
     }
 
@@ -303,7 +302,7 @@ export default function H5Package() {
       setTaskError("");
       setView("task");
     } catch (error) {
-      setFormError(getApiErrorMessage(error, "提交打包任务失败"));
+      setFormError(getApiErrorMessage(error, t("h5p.error.submitFail")));
     } finally {
       setSubmitLoading(false);
     }
@@ -325,7 +324,7 @@ export default function H5Package() {
         downloadUrl,
       });
     } catch (error) {
-      setTaskError(getApiErrorMessage(error, "下载构建产物失败"));
+      setTaskError(getApiErrorMessage(error, t("h5p.error.downloadFail")));
     } finally {
       setDownloadKey("");
     }
@@ -344,9 +343,9 @@ export default function H5Package() {
 
   return (
     <Base
-      title="H5封包app - MacCMS"
-      description="一门提供模块化混合开发APP底层框架，用做网站的技术做APP，200+原生功能、2000+映射JS接口，打包APP从一门开始！"
-      keywords="H5封包, app打包, 安卓打包, iOS打包, macOS打包, Windows打包"
+      title={t("h5p.meta.title")}
+      description={t("h5p.meta.description")}
+      keywords={t("h5p.meta.keywords")}
     >
       <section className="relative overflow-hidden">
         <div
@@ -372,7 +371,7 @@ export default function H5Package() {
             tabIndex={expanded ? 0 : -1}
           >
             <span className="text-[18px] md:text-[20px] leading-none">←</span>
-            返回
+            {t("h5p.form.back")}
           </button>
         </div>
 
@@ -386,12 +385,10 @@ export default function H5Package() {
           )}
         >
           <h1 className="text-[24px] md:text-[40px] leading-tight font-medium text-dark">
-            H5封包app
+            {t("h5p.form.heroTitle")}
           </h1>
           <p className="mt-3 md:mt-4 text-[14px] md:text-[16px] leading-[22px] text-text max-w-[340px] md:max-w-[640px] mx-auto">
-            一门提供模块化混合开发APP底层框架，用做网站的技术做APP，200+原生功能、
-            <br className="hidden md:block" />
-            2000+映射JS接口，打包APP从一门开始！
+            {t("h5p.form.heroDesc")}
           </p>
         </div>
 
@@ -411,6 +408,7 @@ export default function H5Package() {
                 taskLoading={taskLoading}
                 taskError={taskError}
                 downloadKey={downloadKey}
+                platforms={platforms}
                 onHistory={handleOpenHistory}
                 onDownload={handleDownload}
               />
@@ -441,6 +439,7 @@ export default function H5Package() {
                 formError={formError}
                 submitLoading={submitLoading}
                 canSubmit={canSubmit}
+                platforms={platforms}
               />
             )}
           </div>
@@ -450,25 +449,29 @@ export default function H5Package() {
       <section className="pt-8 md:pt-[60px] pb-10 md:pb-[100px]">
         <div className="container">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-8">
-            {FEATURES.map((feature) => (
-              <div key={feature.title}>
-                <div className="relative rounded-[20px] md:rounded-[28px] overflow-hidden aspect-[584/286] bg-[#F5F8F9]">
-                  <Image
-                    src={feature.image}
-                    alt={feature.title}
-                    fill
-                    sizes="(max-width: 768px) 100vw, 50vw"
-                    className="object-cover"
-                  />
+            {FEATURE_DEFS.map((feature) => {
+              const title = t(feature.titleKey);
+              const desc = t(feature.descKey);
+              return (
+                <div key={feature.titleKey}>
+                  <div className="relative rounded-[20px] md:rounded-[28px] overflow-hidden aspect-[584/286] bg-[#F5F8F9]">
+                    <Image
+                      src={feature.image}
+                      alt={title}
+                      fill
+                      sizes="(max-width: 768px) 100vw, 50vw"
+                      className="object-cover"
+                    />
+                  </div>
+                  <h3 className="mt-4 md:mt-7 text-[18px] md:text-[20px] leading-7 font-medium text-dark">
+                    {title}
+                  </h3>
+                  <p className="mt-2 md:mt-[14px] text-[14px] leading-5 md:leading-5 text-text">
+                    {desc}
+                  </p>
                 </div>
-                <h3 className="mt-4 md:mt-7 text-[18px] md:text-[20px] leading-7 font-medium text-dark">
-                  {feature.title}
-                </h3>
-                <p className="mt-2 md:mt-[14px] text-[14px] leading-5 md:leading-5 text-text">
-                  {feature.desc}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -496,7 +499,10 @@ function FormView({
   formError,
   submitLoading,
   canSubmit,
+  platforms,
 }) {
+  const { t } = useTranslation();
+
   return (
     <>
       <div
@@ -507,7 +513,7 @@ function FormView({
       >
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-[20px] md:text-[24px] leading-[33px] font-medium text-dark">
-            H5封包app
+            {t("h5p.form.title")}
           </h2>
           <button
             type="button"
@@ -515,7 +521,7 @@ function FormView({
             className="h-[28px] px-3 rounded-[14px] text-[14px] text-primary"
             style={{ backgroundColor: "rgba(64,204,146,0.16)" }}
           >
-            历史
+            {t("h5p.form.history")}
           </button>
         </div>
       </div>
@@ -527,14 +533,14 @@ function FormView({
         )}
       >
         <label className="block text-[14px] md:text-[16px] leading-[22px] text-dark">
-          H5 网址
+          {t("h5p.form.urlLabel")}
         </label>
       </div>
       <input
         type="url"
         value={url}
         onChange={(event) => setUrl(event.target.value)}
-        placeholder="https://your-h5-app.com"
+        placeholder={t("h5p.form.urlPlaceholder")}
         className="w-full h-11 md:h-[50px] rounded-lg px-4 md:px-6 text-[14px] md:text-[16px] text-dark placeholder:text-text bg-[rgba(246,249,250,1)] border-0 focus:outline-none focus:ring-2 focus:ring-primary/40"
       />
 
@@ -546,14 +552,14 @@ function FormView({
         )}
       >
         <label className="block text-[14px] md:text-[16px] leading-[22px] text-dark mb-[10px]">
-          App名称
+          {t("h5p.form.appNameLabel")}
         </label>
         <input
           type="text"
           value={appName}
           maxLength={64}
           onChange={(event) => setAppName(event.target.value)}
-          placeholder="My App"
+          placeholder={t("h5p.form.appNamePlaceholder")}
           className="w-full h-11 md:h-[50px] rounded-lg px-4 md:px-6 text-[14px] md:text-[16px] text-dark placeholder:text-text bg-[rgba(246,249,250,1)] border-0 focus:outline-none focus:ring-2 focus:ring-primary/40"
         />
       </div>
@@ -567,7 +573,7 @@ function FormView({
         )}
       >
         <label className="block text-[14px] md:text-[16px] leading-[22px] text-dark">
-          目标平台
+          {t("h5p.form.platformsLabel")}
         </label>
       </div>
 
@@ -577,7 +583,7 @@ function FormView({
           !expanded && "mt-4 md:mt-[10px]",
         )}
       >
-        {PLATFORMS.map((platform) => {
+        {platforms.map((platform) => {
           const active = selected.includes(platform.key);
           return (
             <button
@@ -634,17 +640,17 @@ function FormView({
         )}
       >
         <label className="block text-[14px] md:text-[16px] leading-[22px] text-dark mb-[10px]">
-          Android包名
+          {t("h5p.form.androidPkgLabel")}
         </label>
         <input
           type="text"
           value={pkg}
           onChange={(event) => setPkg(event.target.value)}
-          placeholder="com.example.app"
+          placeholder={t("h5p.form.androidPkgPlaceholder")}
           className="w-full h-11 md:h-[50px] rounded-lg px-4 md:px-6 text-[14px] md:text-[16px] text-dark placeholder:text-text bg-[rgba(246,249,250,1)] border-0 focus:outline-none focus:ring-2 focus:ring-primary/40"
         />
         <p className="mt-[10px] text-[12px] md:text-[14px] leading-5 text-text">
-          安卓平台需要填写合法包名，格式类似 `com.example.app`。
+          {t("h5p.form.androidPkgHint")}
         </p>
       </div>
 
@@ -656,14 +662,14 @@ function FormView({
         )}
       >
         <label className="block text-[14px] md:text-[16px] leading-[22px] text-dark mb-[10px]">
-          App 图标
+          {t("h5p.form.iconLabel")}
         </label>
         <div className="flex items-center gap-3 md:gap-4">
           <label
             className="inline-flex items-center justify-center h-11 md:h-[50px] px-5 md:px-6 rounded-[22px] md:rounded-[25px] cursor-pointer text-[14px] md:text-[16px] font-medium text-primary"
             style={{ backgroundColor: "rgba(237,250,247,1)" }}
           >
-            选择文件
+            {t("h5p.form.iconChoose")}
             <input
               type="file"
               accept="image/png"
@@ -675,11 +681,11 @@ function FormView({
             className="inline-flex items-center justify-center h-11 md:h-[50px] px-5 md:px-6 rounded-[22px] md:rounded-[25px] text-[14px] md:text-[16px] text-text truncate max-w-[160px] md:max-w-none"
             style={{ backgroundColor: "rgba(246,249,250,1)" }}
           >
-            {iconFile ? iconFile.name : "未选择 PNG 文件"}
+            {iconFile ? iconFile.name : t("h5p.form.iconNone")}
           </span>
         </div>
         <p className="mt-[10px] text-[12px] md:text-[14px] leading-5 text-text">
-          上传一个尺寸至少为 1024x1024 的方形 PNG 图片。服务器会根据不同的平台对图片进行调整处理。
+          {t("h5p.form.iconHint")}
         </p>
       </div>
 
@@ -696,7 +702,7 @@ function FormView({
           disabled={expanded && !canSubmit}
           className="inline-flex items-center justify-center gap-2 md:gap-3 h-11 md:h-12 px-8 rounded-3xl bg-primary text-white text-[14px] md:text-[16px] hover:opacity-90 transition-opacity disabled:opacity-60"
         >
-          {submitLoading ? "提交中..." : "开始包装"}
+          {submitLoading ? t("h5p.form.submitting") : t("h5p.form.submit")}
           <Image
             src="/images/h5-package/arrow.png"
             alt=""
@@ -714,18 +720,20 @@ function TaskView({
   taskLoading,
   taskError,
   downloadKey,
+  platforms,
   onHistory,
   onDownload,
 }) {
+  const { t } = useTranslation();
   const queueState = job?.queue_state || job?.status;
-  const waitingText = formatWaitTime(job?.estimated_wait_seconds);
+  const waitingText = formatWaitTime(t, job?.estimated_wait_seconds);
   const platformEntries = Object.entries(job?.platforms ?? {});
 
   return (
     <>
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-[20px] md:text-[24px] leading-[33px] font-medium text-dark">
-          打包状态
+          {t("h5p.task.title")}
         </h2>
         <button
           type="button"
@@ -733,7 +741,7 @@ function TaskView({
           className="h-[28px] px-3 rounded-[14px] text-[14px] text-primary"
           style={{ backgroundColor: "rgba(64,204,146,0.16)" }}
         >
-          历史
+          {t("h5p.form.history")}
         </button>
       </div>
 
@@ -747,14 +755,16 @@ function TaskView({
         <div className="mt-4 md:mt-5 rounded-[18px] bg-[rgba(246,249,250,1)] px-4 py-3 md:px-5 md:py-4">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <span className="text-[13px] md:text-[14px] text-dark">
-              队列状态：{formatQueueStatus(queueState)}
+              {t("h5p.task.queueStatus", {
+                value: formatQueueStatus(t, queueState),
+              })}
             </span>
             <span className="text-[13px] md:text-[14px] text-text">
-              提交时间：{formatDateTime(job.created_at)}
+              {t("h5p.task.createdAt", { value: formatDateTime(job.created_at) })}
             </span>
             {waitingText ? (
               <span className="text-[13px] md:text-[14px] text-text">
-                预计等待：{waitingText}
+                {t("h5p.task.estimatedWait", { value: waitingText })}
               </span>
             ) : null}
           </div>
@@ -768,7 +778,7 @@ function TaskView({
       ) : null}
 
       {taskLoading && !job ? (
-        <p className="mt-6 text-[14px] text-text">正在获取打包状态...</p>
+        <p className="mt-6 text-[14px] text-text">{t("h5p.task.loading")}</p>
       ) : null}
 
       <div className="mt-4 md:mt-5 flex flex-col gap-3 md:gap-4">
@@ -777,6 +787,7 @@ function TaskView({
             key={platformKey}
             platformKey={platformKey}
             platformData={platformData}
+            platforms={platforms}
             downloading={downloadKey === platformKey}
             onDownload={onDownload}
           />
@@ -784,7 +795,7 @@ function TaskView({
       </div>
 
       {!taskLoading && !platformEntries.length ? (
-        <p className="mt-6 text-[14px] text-text">暂无平台状态信息。</p>
+        <p className="mt-6 text-[14px] text-text">{t("h5p.task.noPlatforms")}</p>
       ) : null}
     </>
   );
@@ -793,17 +804,16 @@ function TaskView({
 function TaskPlatformRow({
   platformKey,
   platformData,
+  platforms,
   downloading,
   onDownload,
 }) {
-  const platform = platformByKey(platformKey);
-  const statusText = {
-    pending: "等待处理",
-    running: "打包中...",
-    done: "已完成，可下载",
-    failed: "打包失败",
-    cancelled: "已取消",
-  }[platformData.status] ?? platformData.status;
+  const { t } = useTranslation();
+  const platform = platforms.find((entry) => entry.key === platformKey);
+  const statusKey = `h5p.platformStatus.${platformData.status}`;
+  const translatedStatus = t(statusKey);
+  const statusText =
+    translatedStatus === statusKey ? platformData.status : translatedStatus;
 
   return (
     <div className="relative rounded-2xl overflow-hidden min-h-[78px] bg-[rgba(246,249,250,1)]">
@@ -854,7 +864,7 @@ function TaskPlatformRow({
               disabled={downloading}
               className="inline-flex items-center justify-center h-8 px-4 rounded-[16px] bg-primary text-white text-[12px] md:text-[14px] disabled:opacity-60"
             >
-              {downloading ? "下载中..." : "下载"}
+              {downloading ? t("h5p.task.downloading") : t("h5p.task.download")}
             </button>
           ) : (
             <StatusBadge status={platformData.status} />
@@ -872,11 +882,13 @@ function HistoryView({
   onNew,
   onOpenTask,
 }) {
+  const { t } = useTranslation();
+
   return (
     <>
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-[20px] md:text-[24px] leading-[33px] font-medium text-dark">
-          历史记录
+          {t("h5p.history.title")}
         </h2>
         <button
           type="button"
@@ -884,7 +896,7 @@ function HistoryView({
           className="h-[28px] px-3 rounded-[14px] text-[14px] text-primary"
           style={{ backgroundColor: "rgba(64,204,146,0.16)" }}
         >
-          新建
+          {t("h5p.history.new")}
         </button>
       </div>
 
@@ -894,11 +906,11 @@ function HistoryView({
         </p>
       ) : null}
 
-      <div className="mt-4 md:mt-5 flex flex-col gap-3 md:gap-4 max-h-[420px] overflow-y-auto">
+      <div className="mt-4 md:mt-5 flex flex-col gap-3 md:gap-4 max-h-[420px] overflow-y-auto pb-4 md:pb-6">
         {historyLoading ? (
-          <p className="text-center text-text py-8">正在加载历史记录...</p>
+          <p className="text-center text-text py-8">{t("h5p.history.loading")}</p>
         ) : history.length === 0 ? (
-          <p className="text-center text-text py-8">暂无历史记录</p>
+          <p className="text-center text-text py-8">{t("h5p.history.empty")}</p>
         ) : (
           history.map((item) => (
             <HistoryRow
@@ -914,6 +926,8 @@ function HistoryView({
 }
 
 function HistoryRow({ item, onOpenTask }) {
+  const { t } = useTranslation();
+
   return (
     <button
       type="button"
@@ -927,12 +941,14 @@ function HistoryRow({ item, onOpenTask }) {
           </span>
           <span className="block mt-1 text-[12px] md:text-[14px] text-text leading-[20px]">
             {formatDateTime(item.created_at)} ·{" "}
-            {formatPlatformList(item.requested_platforms)}
+            {formatPlatformList(t, item.requested_platforms)}
           </span>
         </div>
         <div className="shrink-0 flex items-center gap-2">
           <StatusBadge status={item.status} />
-          <span className="text-[12px] md:text-[14px] text-primary">详情</span>
+          <span className="text-[12px] md:text-[14px] text-primary">
+            {t("h5p.history.detail")}
+          </span>
         </div>
       </div>
     </button>
@@ -940,49 +956,27 @@ function HistoryRow({ item, onOpenTask }) {
 }
 
 function StatusBadge({ status }) {
-  const config = {
-    pending: {
-      label: "等待中",
-      className: "bg-white text-text",
-    },
-    submitted: {
-      label: "已提交",
-      className: "bg-white text-text",
-    },
-    waiting_capacity: {
-      label: "等待资源",
-      className: "bg-white text-text",
-    },
-    queued: {
-      label: "排队中",
-      className: "bg-white text-text",
-    },
-    running: {
-      label: "打包中",
-      className: "bg-white text-primary",
-    },
-    done: {
-      label: "已完成",
-      className: "bg-white text-text",
-    },
-    failed: {
-      label: "失败",
-      className: "bg-white text-[#E34D59]",
-    },
-    cancelled: {
-      label: "已取消",
-      className: "bg-white text-text",
-    },
-  }[status] ?? {
-    label: status,
-    className: "bg-white text-text",
+  const { t } = useTranslation();
+  const styleMap = {
+    pending: "bg-white text-text",
+    submitted: "bg-white text-text",
+    waiting_capacity: "bg-white text-text",
+    queued: "bg-white text-text",
+    running: "bg-white text-primary",
+    done: "bg-white text-text",
+    failed: "bg-white text-[#E34D59]",
+    cancelled: "bg-white text-text",
   };
+  const className = styleMap[status] ?? "bg-white text-text";
+  const labelKey = `h5p.statusBadge.${status}`;
+  const translated = t(labelKey);
+  const label = translated === labelKey ? status : translated;
 
   return (
     <span
       className={clsx(
         "inline-flex items-center gap-1.5 h-7 px-3 rounded-[14px] text-[12px] md:text-[14px]",
-        config.className,
+        className,
       )}
     >
       {status === "done" ? (
@@ -996,14 +990,14 @@ function StatusBadge({ status }) {
       {status === "running" ? (
         <span className="inline-block w-2.5 h-[2px] bg-primary" />
       ) : null}
-      {config.label}
+      {label}
     </span>
   );
 }
 
 async function validateIcon(file) {
   if (file.type !== "image/png") {
-    return "图标必须是 PNG 图片";
+    return "h5p.error.iconPng";
   }
 
   const objectUrl = URL.createObjectURL(file);
@@ -1013,15 +1007,15 @@ async function validateIcon(file) {
       const image = new window.Image();
       image.onload = () =>
         resolve({ width: image.width, height: image.height });
-      image.onerror = () => reject(new Error("图标必须是有效的 PNG 图片"));
+      image.onerror = () => reject(new Error("h5p.error.iconValid"));
       image.src = objectUrl;
     });
 
     if (dimensions.width !== dimensions.height) {
-      return "图标必须是正方形图片";
+      return "h5p.error.iconSquare";
     }
     if (dimensions.width < 1024 || dimensions.height < 1024) {
-      return "图标尺寸至少需要 1024x1024";
+      return "h5p.error.iconSize";
     }
 
     return null;
@@ -1029,7 +1023,7 @@ async function validateIcon(file) {
     if (error instanceof Error) {
       return error.message;
     }
-    return "图标必须是有效的 PNG 图片";
+    return "h5p.error.iconValid";
   } finally {
     URL.revokeObjectURL(objectUrl);
   }

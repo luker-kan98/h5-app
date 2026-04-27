@@ -2148,5 +2148,115 @@
             "優化搜尋相容性。"
         ]
 
+    },
+    "h5p": {
+        "meta": {
+            "title": "H5封包app - MacCMS",
+            "description": "蘋果CMS提供模組化混合開發APP底層框架，用做網站的技術做APP，200+原生功能、2000+映射JS介面，打包APP從蘋果CMS開始！",
+            "keywords": "H5封包, app打包, 安卓打包, iOS打包, macOS打包, Windows打包"
+        },
+        "platform": {
+            "android": "安卓",
+            "ios": "iOS (未簽名)",
+            "macos": "macOS",
+            "windows": "Windows",
+            "androidStatus": "Android",
+            "iosStatus": "iOS (未簽名)"
+        },
+        "feature": {
+            "androidTitle": "安卓端 打包",
+            "androidDesc": "快速產生安卓原生APP，完美適配全機型，無需安卓原生程式設計，網站 / H5 網頁直接打包，助力快速佈局安卓行動端！",
+            "iosTitle": "iOS端 打包",
+            "iosDesc": "一鍵產生蘋果 iOS 應用，無需蘋果原生程式設計，同時支援安卓 & iOS 雙端打包，快速迭代相容，協助上架 App Store！",
+            "macosTitle": "macOS端 打包",
+            "macosDesc": "網站 / H5 直接打包蘋果電腦桌面應用，無需懂 macOS 開發，自主操作自助配置，草根站長也能快速做桌面應用！",
+            "windowsTitle": "Windows端 打包",
+            "windowsDesc": "網頁 / H5 一鍵打包 Windows 桌面應用，無需原生程式設計，快速產生適配 Windows 系統的桌面 APP，玩轉多端佈局！"
+        },
+        "queueStatus": {
+            "submitted": "已提交",
+            "waiting_capacity": "等待資源",
+            "queued": "排隊中",
+            "running": "打包中",
+            "done": "已完成",
+            "failed": "已結束",
+            "unknown": "未知狀態"
+        },
+        "platformStatus": {
+            "pending": "等待處理",
+            "running": "打包中...",
+            "done": "已完成，可下載",
+            "failed": "打包失敗",
+            "cancelled": "已取消"
+        },
+        "statusBadge": {
+            "pending": "等待中",
+            "submitted": "已提交",
+            "waiting_capacity": "等待資源",
+            "queued": "排隊中",
+            "running": "打包中",
+            "done": "已完成",
+            "failed": "失敗",
+            "cancelled": "已取消"
+        },
+        "form": {
+            "back": "返回",
+            "heroTitle": "H5封包app",
+            "heroDesc": "蘋果CMS提供模組化混合開發APP底層框架，用做網站的技術做APP，200+原生功能、2000+映射JS介面，打包APP從蘋果CMS開始！",
+            "title": "H5封包app",
+            "history": "歷史",
+            "urlLabel": "H5 網址",
+            "urlPlaceholder": "https://your-h5-app.com",
+            "appNameLabel": "App名稱",
+            "appNamePlaceholder": "My App",
+            "platformsLabel": "目標平台",
+            "androidPkgLabel": "Android包名",
+            "androidPkgPlaceholder": "com.example.app",
+            "androidPkgHint": "安卓平台需要填寫合法包名，格式類似 `com.example.app`。",
+            "iconLabel": "App 圖示",
+            "iconChoose": "選擇檔案",
+            "iconNone": "未選擇 PNG 檔案",
+            "iconHint": "上傳一個尺寸至少為 1024x1024 的正方形 PNG 圖片。伺服器會根據不同的平台對圖片進行調整處理。",
+            "submitting": "提交中...",
+            "submit": "開始打包"
+        },
+        "error": {
+            "urlRequired": "H5 網址不能為空",
+            "appNameRequired": "App 名稱不能為空",
+            "platformRequired": "請至少選擇一個目標平台",
+            "iconRequired": "請上傳 App 圖示",
+            "androidPkgRequired": "選擇安卓平台時請填寫 Android 包名",
+            "androidPkgFormat": "Android 包名格式應類似 com.example.app",
+            "iconPng": "圖示必須是 PNG 圖片",
+            "iconValid": "圖示必須是有效的 PNG 圖片",
+            "iconSquare": "圖示必須是正方形圖片",
+            "iconSize": "圖示尺寸至少需要 1024x1024",
+            "submitFail": "提交打包任務失敗",
+            "statusFail": "取得打包狀態失敗",
+            "downloadFail": "下載建置產物失敗",
+            "historyFail": "取得歷史記錄失敗"
+        },
+        "task": {
+            "title": "打包狀態",
+            "queueStatus": "佇列狀態：{{value}}",
+            "createdAt": "提交時間：{{value}}",
+            "estimatedWait": "預計等待：{{value}}",
+            "loading": "正在取得打包狀態...",
+            "noPlatforms": "暫無平台狀態資訊。",
+            "downloading": "下載中...",
+            "download": "下載"
+        },
+        "history": {
+            "title": "歷史記錄",
+            "new": "新建",
+            "loading": "正在載入歷史記錄...",
+            "empty": "暫無歷史記錄",
+            "detail": "詳情"
+        },
+        "wait": {
+            "seconds": "{{value}} 秒",
+            "minutes": "{{value}} 分鐘",
+            "minutesSeconds": "{{minutes}} 分 {{seconds}} 秒"
+        }
     }
 }

@@ -2147,5 +2147,115 @@
             "Optimize search compatibility."
         ]
 
+    },
+    "h5p": {
+        "meta": {
+            "title": "H5 to App - MacCMS",
+            "description": "MacCMS provides a modular hybrid app framework — build native apps using web technologies, with 200+ native features and 2000+ JS APIs. Start packaging apps with MacCMS!",
+            "keywords": "H5 packaging, app build, Android build, iOS build, macOS build, Windows build"
+        },
+        "platform": {
+            "android": "Android",
+            "ios": "iOS (Unsigned)",
+            "macos": "macOS",
+            "windows": "Windows",
+            "androidStatus": "Android",
+            "iosStatus": "iOS (Unsigned)"
+        },
+        "feature": {
+            "androidTitle": "Android Build",
+            "androidDesc": "Quickly generate native Android apps with full device compatibility — no native Android programming required. Package your website or H5 directly to launch on Android fast!",
+            "iosTitle": "iOS Build",
+            "iosDesc": "Generate Apple iOS apps with one click — no native iOS programming required. Build for both Android and iOS, iterate quickly, and prepare for the App Store!",
+            "macosTitle": "macOS Build",
+            "macosDesc": "Package your website or H5 directly into a macOS desktop app — no macOS development experience required. Self-serve configuration lets even hobbyist webmasters ship desktop apps fast!",
+            "windowsTitle": "Windows Build",
+            "windowsDesc": "Package your website or H5 into a Windows desktop app with one click — no native programming required. Generate Windows-compatible desktop apps and reach more platforms!"
+        },
+        "queueStatus": {
+            "submitted": "Submitted",
+            "waiting_capacity": "Waiting for capacity",
+            "queued": "Queued",
+            "running": "Building",
+            "done": "Completed",
+            "failed": "Ended",
+            "unknown": "Unknown status"
+        },
+        "platformStatus": {
+            "pending": "Pending",
+            "running": "Building...",
+            "done": "Completed, ready to download",
+            "failed": "Build failed",
+            "cancelled": "Cancelled"
+        },
+        "statusBadge": {
+            "pending": "Pending",
+            "submitted": "Submitted",
+            "waiting_capacity": "Waiting for capacity",
+            "queued": "Queued",
+            "running": "Building",
+            "done": "Completed",
+            "failed": "Failed",
+            "cancelled": "Cancelled"
+        },
+        "form": {
+            "back": "Back",
+            "heroTitle": "H5 to App",
+            "heroDesc": "MacCMS provides a modular hybrid app framework — build native apps using web technologies, with 200+ native features and 2000+ JS APIs. Start packaging apps with MacCMS!",
+            "title": "H5 to App",
+            "history": "History",
+            "urlLabel": "H5 URL",
+            "urlPlaceholder": "https://your-h5-app.com",
+            "appNameLabel": "App Name",
+            "appNamePlaceholder": "My App",
+            "platformsLabel": "Target Platforms",
+            "androidPkgLabel": "Android Package Name",
+            "androidPkgPlaceholder": "com.example.app",
+            "androidPkgHint": "Android requires a valid package name, formatted like `com.example.app`.",
+            "iconLabel": "App Icon",
+            "iconChoose": "Choose file",
+            "iconNone": "No PNG selected",
+            "iconHint": "Upload a square PNG at least 1024x1024 in size. The server will resize it for each target platform.",
+            "submitting": "Submitting...",
+            "submit": "Start Build"
+        },
+        "error": {
+            "urlRequired": "H5 URL is required",
+            "appNameRequired": "App name is required",
+            "platformRequired": "Please select at least one target platform",
+            "iconRequired": "Please upload an app icon",
+            "androidPkgRequired": "Android package name is required when Android is selected",
+            "androidPkgFormat": "Android package name should look like com.example.app",
+            "iconPng": "Icon must be a PNG image",
+            "iconValid": "Icon must be a valid PNG image",
+            "iconSquare": "Icon must be a square image",
+            "iconSize": "Icon must be at least 1024x1024",
+            "submitFail": "Failed to submit build task",
+            "statusFail": "Failed to fetch build status",
+            "downloadFail": "Failed to download build artifact",
+            "historyFail": "Failed to fetch build history"
+        },
+        "task": {
+            "title": "Build Status",
+            "queueStatus": "Queue status: {{value}}",
+            "createdAt": "Submitted at: {{value}}",
+            "estimatedWait": "Estimated wait: {{value}}",
+            "loading": "Fetching build status...",
+            "noPlatforms": "No platform status available.",
+            "downloading": "Downloading...",
+            "download": "Download"
+        },
+        "history": {
+            "title": "History",
+            "new": "New",
+            "loading": "Loading history...",
+            "empty": "No history yet",
+            "detail": "Details"
+        },
+        "wait": {
+            "seconds": "{{value}} sec",
+            "minutes": "{{value}} min",
+            "minutesSeconds": "{{minutes}} min {{seconds}} sec"
+        }
     }
 }

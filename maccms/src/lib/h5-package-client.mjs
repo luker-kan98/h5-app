@@ -76,7 +76,7 @@ export async function fetchBuildStatus({
 
 export async function fetchBuildHistory({
   apiBaseUrl = getApiBaseUrl(),
-}) {
+} = {}) {
   const client = createClient(apiBaseUrl);
   const { data } = await client.get("/builds/history");
   return data;
@@ -90,20 +90,15 @@ export async function downloadBuildArtifact({
     throw new Error("Download URL is required");
   }
 
-  const response = await axios.get(resolveApiUrl(downloadUrl, apiBaseUrl), {
-    responseType: "blob",
-  });
-
-  const objectUrl = URL.createObjectURL(response.data);
+  const target = resolveApiUrl(downloadUrl, apiBaseUrl);
   const link = document.createElement("a");
-  const finalUrl = response.request?.responseURL || downloadUrl;
-
-  link.href = objectUrl;
-  link.download = getDownloadFilename(finalUrl);
+  link.href = target;
+  link.target = "_blank";
+  link.rel = "noopener";
+  link.download = getDownloadFilename(target);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  URL.revokeObjectURL(objectUrl);
 }
 
 function createClient(apiBaseUrl) {
