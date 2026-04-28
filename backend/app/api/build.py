@@ -4,11 +4,12 @@ import re
 import uuid
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db, get_current_user
+from app.i18n import t
 from app.models.build_job import BuildJob
 from app.models.build_request import BuildRequest
 from app.models.build_task import BuildTask
@@ -42,58 +43,70 @@ async def submit_build(
     keystore_password: Optional[str] = Form(None),
     key_alias: Optional[str] = Form(None),
     key_password: Optional[str] = Form(None),
+    language: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     try:
-        app_name = normalize_app_name(app_name)
+        app_name = normalize_app_name(app_name, language)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
-    # Validate URL
     try:
-        validate_h5_url(h5_url)
+        validate_h5_url(h5_url, language)
     except UrlValidationError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
-    # Reject duplicate URL submissions (allow re-submit if all prior requests failed)
     existing = db.query(BuildRequest).filter(
         BuildRequest.h5_url == h5_url,
         BuildRequest.status.notin_(["failed"]),
     ).first()
     if existing:
-        raise HTTPException(status_code=409, detail="该URL已提交过打包，不能重复提交")
+        raise HTTPException(status_code=409, detail=t("duplicate_url", language))
 
-    # Validate platforms
+    existing_name = db.query(BuildRequest).filter(
+        BuildRequest.app_name == app_name,
+        BuildRequest.status.notin_(["failed"]),
+    ).first()
+    if existing_name:
+        raise HTTPException(status_code=409, detail=t("duplicate_app_name", language))
+
     invalid = set(platforms) - VALID_PLATFORMS
     if invalid or not platforms:
-        raise HTTPException(status_code=422, detail=f"Invalid platforms: {invalid}")
+        raise HTTPException(status_code=422, detail=t("invalid_platforms", language, invalid=invalid))
 
     if "android" in platforms:
         if not android_package_name:
-            raise HTTPException(status_code=422, detail="Android package name is required when android is selected")
+            raise HTTPException(status_code=422, detail=t("android_package_required", language))
         android_package_name = android_package_name.strip()
         if not ANDROID_PACKAGE_RE.fullmatch(android_package_name):
-            raise HTTPException(status_code=422, detail="Invalid Android package name")
+            raise HTTPException(status_code=422, detail=t("invalid_android_package", language))
     elif android_package_name:
         android_package_name = android_package_name.strip()
         if android_package_name and not ANDROID_PACKAGE_RE.fullmatch(android_package_name):
-            raise HTTPException(status_code=422, detail="Invalid Android package name")
+            raise HTTPException(status_code=422, detail=t("invalid_android_package", language))
+
+    if android_package_name:
+        existing_pkg = db.query(BuildRequest).filter(
+            BuildRequest.android_package_name == android_package_name,
+            BuildRequest.status.notin_(["failed"]),
+        ).first()
+        if existing_pkg:
+            raise HTTPException(status_code=409, detail=t("duplicate_package", language))
 
     icon_contents = await icon_file.read()
     try:
-        validate_icon_upload(icon_contents, icon_file.content_type)
+        validate_icon_upload(icon_contents, icon_file.content_type, language)
     except IconValidationError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
-    # Handle optional keystore upload
     keystore_contents = None
     if keystore_file is not None:
         keystore_contents = await keystore_file.read()
         if len(keystore_contents) == 0:
-            raise HTTPException(status_code=422, detail="Keystore file is empty")
+            raise HTTPException(status_code=422, detail=t("keystore_empty", language))
         if len(keystore_contents) > 1_048_576:
-            raise HTTPException(status_code=422, detail="Keystore file too large (max 1 MB)")
+            raise HTTPException(status_code=422, detail=t("keystore_too_large", language))
 
     request_uuid = str(uuid.uuid4())
     build_request = BuildRequest(
@@ -166,6 +179,7 @@ async def submit_build(
 @router.post("/rebuild/{request_id}", response_model=BuildSubmitResponse)
 def rebuild(
     request_id: str,
+    language: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -174,11 +188,11 @@ def rebuild(
         BuildRequest.user_id == current_user.id,
     ).first()
     if not original:
-        raise HTTPException(status_code=404, detail="Build request not found")
+        raise HTTPException(status_code=404, detail=t("build_request_not_found", language))
     if original.status != "failed":
-        raise HTTPException(status_code=400, detail="Only failed builds can be rebuilt")
+        raise HTTPException(status_code=400, detail=t("only_failed_rebuild", language))
     if original.icon_path and not os.path.isfile(original.icon_path):
-        raise HTTPException(status_code=422, detail="Original icon file missing, please submit a new build")
+        raise HTTPException(status_code=422, detail=t("icon_missing_resubmit", language))
 
     platforms = json.loads(original.requested_platforms)
     new_request = BuildRequest(
@@ -236,6 +250,7 @@ def rebuild(
 @router.get("/build/{task_id}", response_model=BuildStatusResponse)
 def get_build_status(
     task_id: str,
+    language: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -263,7 +278,7 @@ def get_build_status(
         BuildJob.user_id == current_user.id,
     ).first()
     if not job:
-        raise HTTPException(status_code=404, detail="Build job not found")
+        raise HTTPException(status_code=404, detail=t("build_job_not_found", language))
     return build_job_to_status_response(job)
 
 
@@ -271,6 +286,7 @@ def get_build_status(
 def download_file(
     task_id: str,
     filename: str,
+    language: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -282,13 +298,13 @@ def download_file(
     if build_request:
         platform = next((name for name, value in PLATFORM_FILENAMES.items() if value == filename), None)
         if platform is None:
-            raise HTTPException(status_code=404, detail="File not found")
+            raise HTTPException(status_code=404, detail=t("file_not_found", language))
         task = db.query(BuildTask).filter(
             BuildTask.request_id == build_request.id,
             BuildTask.platform == platform,
         ).first()
         if task is None or not task.artifact_path:
-            raise HTTPException(status_code=404, detail="File not found")
+            raise HTTPException(status_code=404, detail=t("file_not_found", language))
         if task.artifact_url:
             return RedirectResponse(task.artifact_url)
         file_path = task.artifact_path
@@ -298,11 +314,11 @@ def download_file(
             BuildJob.user_id == current_user.id,
         ).first()
         if not job:
-            raise HTTPException(status_code=404, detail="Build job not found")
+            raise HTTPException(status_code=404, detail=t("build_job_not_found", language))
         file_path = os.path.join(BUILDS_DIR, task_id, filename)
 
     if not os.path.isfile(file_path):
-        raise HTTPException(status_code=404, detail="File not found")
+        raise HTTPException(status_code=404, detail=t("file_not_found", language))
     return FileResponse(file_path, filename=filename)
 
 

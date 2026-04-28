@@ -1,0 +1,75 @@
+// swift-interface-format-version: 1.0
+// swift-compiler-version: Apple Swift version 6.2 effective-5.10 (swiftlang-6.2.0.19.9 clang-1700.3.19.1)
+// swift-module-flags: -target arm64-apple-ios13-simulator -enable-objc-interop -enable-library-evolution -swift-version 5 -enforce-exclusivity=checked -O -enable-experimental-feature DebugDescriptionMacro -enable-bare-slash-regex -module-name AppVueSDK
+// swift-module-flags-ignorable: -no-verify-emitted-module-interface -formal-cxx-interoperability-mode=off -interface-compiler-version 6.2
+import Compression
+import CryptoKit
+import Foundation
+import Network
+import Security
+import Swift
+import SystemConfiguration
+import UIKit
+import _Concurrency
+import _StringProcessing
+import _SwiftConcurrencyShims
+final public class Reachability {
+  public typealias Callback = (Swift.Bool) -> Swift.Void
+  public init(callback: @escaping AppVueSDK.Reachability.Callback)
+  final public func start()
+  final public func stop()
+  @objc deinit
+}
+@objc @_inheritsConvenienceInitializers final public class AppVue : ObjectiveC.NSObject {
+  @objc public static func preInit()
+  #if compiler(>=5.3) && $NonescapableTypes
+  @objc public static func preInit(window: UIKit.UIWindow?)
+  #endif
+  @objc public static func initializeSDK()
+  #if compiler(>=5.3) && $NonescapableTypes
+  @objc public static func initializeSDK(window: UIKit.UIWindow?)
+  #endif
+  #if compiler(>=5.3) && $NonescapableTypes
+  @objc public static func getWakeupData(url: Foundation.URL, callback: @escaping (AppVueSDK.AVTrackData?) -> Swift.Void)
+  #endif
+  @objc public static func reportEvent(_ event: AppVueSDK.AVEvent)
+  #if compiler(>=5.3) && $NonescapableTypes
+  @objc public static func getInstallData(callback: @escaping (AppVueSDK.AVTrackData?) -> Swift.Void)
+  #endif
+  @objc public static func setLoggingEnabled(_ enabled: Swift.Bool)
+  @objc override dynamic public init()
+  @objc deinit
+}
+@objc @objcMembers final public class AVEvent : ObjectiveC.NSObject {
+  @objc final public let code: Swift.String
+  @objc final public let value: Swift.Int64
+  @objc final public var props: [Swift.String : Swift.String] {
+    get
+  }
+  @objc public init(code: Swift.String, value: Swift.Int64)
+  @objc @discardableResult
+  final public func prop(_ name: Swift.String, _ value: Swift.String) -> AppVueSDK.AVEvent
+  @objc override final public var description: Swift.String {
+    @objc get
+  }
+  @objc deinit
+}
+@objc @objcMembers public class AVTrackData : ObjectiveC.NSObject {
+  @objc public static let empty: AppVueSDK.AVTrackData
+  @objc final public let channel: Swift.String?
+  @objc final public let referrer: Swift.String?
+  @objc public var isEmpty: Swift.Bool {
+    @objc get
+  }
+  #if compiler(>=5.3) && $NonescapableTypes
+  @objc public init(channel: Swift.String?, referrer: Swift.String?)
+  #endif
+  @objc override dynamic public var description: Swift.String {
+    @objc get
+  }
+  @objc public static func appVue_parseQueryString(_ string: Swift.String) -> [Swift.String : Swift.String]
+  @objc deinit
+}
+extension Swift.String {
+  public func AppVue_queryStringToDictionary() -> [Swift.String : Swift.String]
+}

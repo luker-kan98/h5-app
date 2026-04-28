@@ -3,9 +3,11 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Final
+from typing import Final, Optional
 
 from PIL import Image
+
+from app.i18n import t
 
 MIN_ICON_SIZE: Final[int] = 1024
 MAX_APP_NAME_LENGTH: Final[int] = 64
@@ -66,36 +68,36 @@ class IconValidationError(ValueError):
     pass
 
 
-def normalize_app_name(app_name: str) -> str:
+def normalize_app_name(app_name: str, language: Optional[str] = None) -> str:
     normalized = app_name.strip()
     if not normalized:
-        raise ValueError("App name is required")
+        raise ValueError(t("app_name_required", language))
     if len(normalized) > MAX_APP_NAME_LENGTH:
-        raise ValueError(f"App name must be at most {MAX_APP_NAME_LENGTH} characters")
+        raise ValueError(t("app_name_too_long", language, max_length=MAX_APP_NAME_LENGTH))
     return normalized
 
 
-def validate_icon_upload(contents: bytes, content_type: str | None = None) -> None:
+def validate_icon_upload(contents: bytes, content_type: str | None = None, language: Optional[str] = None) -> None:
     if not contents:
-        raise IconValidationError("Icon file is empty")
+        raise IconValidationError(t("icon_empty", language))
     if content_type and content_type != "image/png":
-        raise IconValidationError("Icon must be a PNG image")
+        raise IconValidationError(t("icon_not_png", language))
 
     try:
         with Image.open(io.BytesIO(contents)) as image:
             image.load()
             if image.format != "PNG":
-                raise IconValidationError("Icon must be a PNG image")
+                raise IconValidationError(t("icon_not_png", language))
             width, height = image.size
     except IconValidationError:
         raise
     except Exception as exc:
-        raise IconValidationError("Icon must be a PNG image") from exc
+        raise IconValidationError(t("icon_not_png", language)) from exc
 
     if width != height:
-        raise IconValidationError("Icon must be a square image")
+        raise IconValidationError(t("icon_not_square", language))
     if width < MIN_ICON_SIZE or height < MIN_ICON_SIZE:
-        raise IconValidationError(f"Icon must be at least {MIN_ICON_SIZE}x{MIN_ICON_SIZE} pixels")
+        raise IconValidationError(t("icon_too_small", language, size=MIN_ICON_SIZE))
 
 
 def generate_android_icons(source_path: str, flutter_dir: str) -> None:

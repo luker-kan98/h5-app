@@ -1,0 +1,4 @@
+framework module AppVueSDK {
+  header "AppVueSDK-Swift.h"
+  requires objc
+}

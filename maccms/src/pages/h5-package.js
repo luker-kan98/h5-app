@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { useTranslation } from "react-i18next";
 import Base from "@/layouts/BaseLayout";
 import Footer from "@/layouts/partials/Footer";
+import useLocale from "@/hooks/useLocale";
 import {
   downloadBuildArtifact,
   fetchBuildHistory,
@@ -130,6 +131,7 @@ const formatWaitTime = (t, seconds) => {
 
 export default function H5Package() {
   const { t } = useTranslation();
+  const { locale } = useLocale();
   const platforms = useMemo(() => buildPlatforms(t), [t]);
 
   const [view, setView] = useState("idle");
@@ -175,7 +177,7 @@ export default function H5Package() {
       }
 
       try {
-        const data = await fetchBuildStatus({ taskId: currentTaskId });
+        const data = await fetchBuildStatus({ taskId: currentTaskId, language: locale });
         if (!active) {
           return;
         }
@@ -210,7 +212,7 @@ export default function H5Package() {
         window.clearTimeout(timerId);
       }
     };
-  }, [view, currentTaskId, t]);
+  }, [view, currentTaskId, locale, t]);
 
   const onFileChange = (event) => {
     const file = event.target.files?.[0] ?? null;
@@ -232,7 +234,7 @@ export default function H5Package() {
     setHistoryError("");
 
     try {
-      const data = await fetchBuildHistory();
+      const data = await fetchBuildHistory({ language: locale });
       setHistory(Array.isArray(data) ? data : []);
     } catch (error) {
       setHistoryError(getApiErrorMessage(error, t("h5p.error.historyFail")));
@@ -295,6 +297,7 @@ export default function H5Package() {
           platforms: selected,
           android_package_name: isAndroidSelected ? trimmedPkg : undefined,
         },
+        language: locale,
       });
 
       setCurrentTaskId(data.request_id || data.task_id);
@@ -322,6 +325,7 @@ export default function H5Package() {
     try {
       await downloadBuildArtifact({
         downloadUrl,
+        language: locale,
       });
     } catch (error) {
       setTaskError(getApiErrorMessage(error, t("h5p.error.downloadFail")));

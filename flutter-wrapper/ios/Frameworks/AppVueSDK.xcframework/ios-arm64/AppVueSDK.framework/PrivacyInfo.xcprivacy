@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>NSPrivacyTracking</key>
+    <false/>
+    
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+    
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array>
+        <!-- 如果粘贴板内容用于追踪/分析，需要声明 -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypePasteboard</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+    </array>
+    
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array>
+        <!-- 1. 粘贴板访问（Deep Link 参数读取） -->
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryPasteboard</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <!-- C617.1: 验证应用是 Safari 中打开 URL 的来源（Deep Link 场景） -->
+                <string>C617.1</string>
+            </array>
+        </dict>
+        
+        <!-- 2. UserDefaults 访问（CA92.1 只能用于这里） -->
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <!-- CA92.1: 访问仅应用自身可访问的信息 -->
+                <string>CA92.1</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>

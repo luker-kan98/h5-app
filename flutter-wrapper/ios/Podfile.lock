@@ -1,0 +1,28 @@
+PODS:
+  - AppVueSDK (1.0.0)
+  - Flutter (1.0.0)
+  - webview_flutter_wkwebview (0.0.1):
+    - Flutter
+    - FlutterMacOS
+
+DEPENDENCIES:
+  - AppVueSDK (from `.`)
+  - Flutter (from `Flutter`)
+  - webview_flutter_wkwebview (from `.symlinks/plugins/webview_flutter_wkwebview/darwin`)
+
+EXTERNAL SOURCES:
+  AppVueSDK:
+    :path: "."
+  Flutter:
+    :path: Flutter
+  webview_flutter_wkwebview:
+    :path: ".symlinks/plugins/webview_flutter_wkwebview/darwin"
+
+SPEC CHECKSUMS:
+  AppVueSDK: c332713ce4640b01db6d33f5a7609f4bce0e3550
+  Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
+  webview_flutter_wkwebview: 1821ceac936eba6f7984d89a9f3bcb4dea99ebb2
+
+PODFILE CHECKSUM: cacc5b2e832591709d79892beb0af97a7b055f50
+
+COCOAPODS: 1.16.2

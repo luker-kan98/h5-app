@@ -44,9 +44,10 @@ export function getApiErrorMessage(
 
 export async function submitBuild({
   payload,
+  language,
   apiBaseUrl = getApiBaseUrl(),
 }) {
-  const client = createClient(apiBaseUrl);
+  const client = createClient(apiBaseUrl, { language });
   const formData = new FormData();
 
   formData.append("h5_url", payload.h5_url);
@@ -67,43 +68,54 @@ export async function submitBuild({
 
 export async function fetchBuildStatus({
   taskId,
+  language,
   apiBaseUrl = getApiBaseUrl(),
 }) {
-  const client = createClient(apiBaseUrl);
+  const client = createClient(apiBaseUrl, { language });
   const { data } = await client.get(`/build/${taskId}`);
   return data;
 }
 
 export async function fetchBuildHistory({
+  language,
   apiBaseUrl = getApiBaseUrl(),
 } = {}) {
-  const client = createClient(apiBaseUrl);
+  const client = createClient(apiBaseUrl, { language });
   const { data } = await client.get("/builds/history");
   return data;
 }
 
 export async function downloadBuildArtifact({
   downloadUrl,
+  language,
   apiBaseUrl = getApiBaseUrl(),
 }) {
   if (!downloadUrl) {
     throw new Error("Download URL is required");
   }
 
-  const target = resolveApiUrl(downloadUrl, apiBaseUrl);
+  let target = resolveApiUrl(downloadUrl, apiBaseUrl);
+  if (language) {
+    const separator = target.includes("?") ? "&" : "?";
+    target = `${target}${separator}language=${encodeURIComponent(language)}`;
+  }
   const link = document.createElement("a");
   link.href = target;
   link.target = "_blank";
   link.rel = "noopener";
-  link.download = getDownloadFilename(target);
+  link.download = getDownloadFilename(downloadUrl);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
 }
 
-function createClient(apiBaseUrl) {
+function createClient(apiBaseUrl, params = {}) {
   const normalizedBase = sanitizeApiBaseUrl(apiBaseUrl);
+  const filtered = Object.fromEntries(
+    Object.entries(params).filter(([, v]) => v != null),
+  );
   return axios.create({
     baseURL: normalizedBase || undefined,
+    params: Object.keys(filtered).length > 0 ? filtered : undefined,
   });
 }

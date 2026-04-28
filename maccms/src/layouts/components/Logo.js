@@ -1,23 +1,23 @@
-import ImageFallback from "./ImageFallback";
 import config from "@/config/config.json";
 import Link from "next/link";
 import { useTranslation } from "react-i18next";
+import Lottie from "lottie-react";
+import logoAnimation from "../../../public/images/logo-animation.json";
 
 const Logo = ({ src, lang }) => {
 
-  const { logo, width, height, logo_title } = config.site;
+  const { logo_title } = config.site;
   const {t} = useTranslation();
 
   return (
     <Link href={`/`} className="block navbar-brand">
       <div className="flex flex-row items-center gap-2 h-[48px] md:h-[60px]">
-        <ImageFallback
-          width={width}
-          height={height}
-          src={src ? src : logo}
-          alt={logo_title}
-          priority
-          className={`w-[36px] h-[36px] md:w-[50px] md:h-[50px] shrink-0 self-center`}
+        <Lottie
+          animationData={logoAnimation}
+          loop={true}
+          autoplay={true}
+          className="w-[36px] h-[36px] md:w-[50px] md:h-[50px] shrink-0 self-center"
+          aria-label={logo_title}
         />
         <span className="ml-[2px] md:ml-[2px] text-[18px] md:text-[24px] text-dark font-medium break-keep leading-none self-center">
           {t("menu.logo")}

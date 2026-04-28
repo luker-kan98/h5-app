@@ -1,7 +1,51 @@
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Swiper, SwiperSlide } from "swiper/react";
+import { Autoplay, Pagination } from "swiper/modules";
+import useLocale from "@/hooks/useLocale";
+
+import "swiper/css";
+import "swiper/css/pagination";
+
+const SLIDE_COUNT = 3;
+const BASE_PATH = "/images/home/ai-showcase/carousel";
+const MD_BREAKPOINT = 768;
+
+function getSlideImages(locale) {
+  return Array.from({ length: SLIDE_COUNT }, (_, i) => {
+    const n = i + 1;
+    return {
+      pc: `${BASE_PATH}/slide-${n}-pc-${locale}.png`,
+      h5: `${BASE_PATH}/slide-${n}-h5-${locale}.png`,
+    };
+  });
+}
+
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(true);
+
+  useEffect(() => {
+    const mql = window.matchMedia(`(min-width: ${MD_BREAKPOINT}px)`);
+    setIsDesktop(mql.matches);
+
+    function onChange(e) {
+      setIsDesktop(e.matches);
+    }
+
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+
+  return isDesktop;
+}
 
 export default function HomeAiShowcase() {
   const { t } = useTranslation();
+  const { locale } = useLocale();
+  const isDesktop = useIsDesktop();
+
+  const slides = useMemo(() => getSlideImages(locale), [locale]);
+  const viewport = isDesktop ? "pc" : "h5";
 
   return (
     <section
@@ -35,35 +79,61 @@ export default function HomeAiShowcase() {
         </p>
 
         <div className="relative mx-auto mt-10 max-w-[960px] px-1 md:mt-14 lg:mt-16">
-          <img
-            src="/images/home/ai-showcase/browser-mockup.png"
-            alt={t("home.showcaseImgAlt")}
-            className="h-auto w-full rounded-[12px] border border-gray-200/60 shadow-[0_24px_80px_-20px_rgba(15,118,110,0.18)] md:rounded-2xl"
-            loading="lazy"
-            decoding="async"
-          />
-          {/* Floating robot-mascot inside white disc (decorative), bottom-right — matches UI reference */}
-          <div
-            className="pointer-events-none absolute bottom-[5%] right-0 z-10 sm:right-[-2%] md:bottom-[7%] md:right-[-1%]"
-            aria-hidden
+          <Swiper
+            key={`${locale}-${viewport}`}
+            modules={[Autoplay, Pagination]}
+            autoplay={{ delay: 4000, disableOnInteraction: false }}
+            pagination={{ clickable: true }}
+            loop
+            speed={600}
+            className="ai-showcase-swiper"
           >
-            <div
-              className="flex aspect-square w-[min(32vw,124px)] min-w-[92px] max-w-[154px] items-center justify-center rounded-full border border-white bg-white/95 p-[6px] shadow-[0_14px_40px_-6px_rgba(15,118,110,0.28),0_6px_24px_rgba(0,0,0,0.08)] ring-[5px] ring-[#e8f8f0] sm:min-w-[104px] sm:max-w-[140px] md:w-[min(17vw,156px)] md:max-w-[168px] md:p-2 md:ring-[7px]"
-            >
-              <img
-                src="/images/branding/robot-mascot.png"
-                srcSet="/images/branding/robot-mascot.png 1x, /images/branding/robot-mascot@2x.png 2x"
-                width={96}
-                height={96}
-                alt=""
-                className="h-full w-full rounded-full object-cover"
-                loading="lazy"
-                decoding="async"
-              />
-            </div>
-          </div>
+            {slides.map((slide, idx) => (
+              <SwiperSlide key={idx}>
+                <img
+                  src={isDesktop ? slide.pc : slide.h5}
+                  alt={`${t("home.showcaseImgAlt")} ${idx + 1}`}
+                  className="h-auto w-full rounded-[12px] md:rounded-2xl"
+                  loading={idx === 0 ? "eager" : "lazy"}
+                  decoding="async"
+                />
+              </SwiperSlide>
+            ))}
+          </Swiper>
         </div>
       </div>
+
+      <style jsx global>{`
+        .ai-showcase-swiper {
+          border-radius: 12px;
+          overflow: hidden;
+          background: transparent;
+        }
+        .ai-showcase-swiper .swiper-slide {
+          background: transparent;
+        }
+        @media (min-width: 768px) {
+          .ai-showcase-swiper {
+            border-radius: 16px;
+          }
+        }
+        .ai-showcase-swiper .swiper-pagination {
+          bottom: 12px !important;
+        }
+        .ai-showcase-swiper .swiper-pagination-bullet {
+          width: 8px;
+          height: 8px;
+          background: #fff;
+          opacity: 0.6;
+          transition: opacity 0.2s, width 0.2s, border-radius 0.2s;
+        }
+        .ai-showcase-swiper .swiper-pagination-bullet-active {
+          opacity: 1;
+          width: 20px;
+          border-radius: 4px;
+          background: #fff;
+        }
+      `}</style>
     </section>
   );
 }

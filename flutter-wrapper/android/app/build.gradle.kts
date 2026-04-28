@@ -1,5 +1,3 @@
-import java.util.Properties
-
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -48,7 +46,7 @@ android {
 }
 
 dependencies {
-    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar", "*.jar"))))
+    implementation(files("libs/appvue-v1.0.0-release.aar"))
 }
 
 flutter {

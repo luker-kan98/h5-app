@@ -1,5 +1,8 @@
 import ipaddress
 import urllib.parse
+from typing import Optional
+
+from app.i18n import t
 
 
 class UrlValidationError(ValueError):
@@ -16,22 +19,22 @@ _PRIVATE_NETWORKS = [
 ]
 
 
-def validate_h5_url(url: str) -> None:
+def validate_h5_url(url: str, language: Optional[str] = None) -> None:
     """Validate that url is a safe, public HTTP(S) URL. Raises UrlValidationError on failure."""
     if not url:
-        raise UrlValidationError("URL must not be empty")
+        raise UrlValidationError(t("url_empty", language))
 
     parsed = urllib.parse.urlparse(url)
 
     if parsed.scheme not in ("http", "https"):
-        raise UrlValidationError(f"URL scheme must be http or https, got '{parsed.scheme}'")
+        raise UrlValidationError(t("url_invalid_scheme", language, scheme=parsed.scheme))
 
     hostname = parsed.hostname
     if not hostname:
-        raise UrlValidationError("URL must have a valid hostname")
+        raise UrlValidationError(t("url_invalid_hostname", language))
 
     if hostname.lower() in ("localhost", "localhost.localdomain"):
-        raise UrlValidationError("URL must not point to an internal address")
+        raise UrlValidationError(t("url_internal_address", language))
 
     try:
         addr = ipaddress.ip_address(hostname)
@@ -40,7 +43,7 @@ def validate_h5_url(url: str) -> None:
 
     if addr is not None:
         if addr.is_private or addr.is_loopback or addr.is_link_local:
-            raise UrlValidationError("URL must not point to an internal address")
+            raise UrlValidationError(t("url_internal_address", language))
         for network in _PRIVATE_NETWORKS:
             if addr in network:
-                raise UrlValidationError("URL must not point to an internal address")
+                raise UrlValidationError(t("url_internal_address", language))

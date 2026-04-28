@@ -360,3 +360,67 @@ def test_submit_build_rejects_duplicate_url(client, auth_headers, tmp_path):
         )
     assert resp2.status_code == 409
     assert "已提交过打包" in resp2.json()["detail"]
+
+
+def test_submit_build_rejects_duplicate_app_name(client, auth_headers, tmp_path):
+    with patch("app.api.build.BUILDS_DIR", str(tmp_path)), \
+         patch("app.api.build.run_scheduler_once", return_value={"promoted": 0, "dispatched": 0}), \
+         patch("app.api.build.refresh_request_status", return_value="submitted"), \
+         patch("app.api.build.estimate_request_wait_seconds", return_value=0):
+        resp1 = client.post(
+            "/build",
+            data=_build_form_data(
+                h5_url="https://dup-name-1.example.com",
+                app_name="Duplicate Name",
+                android_package_name="com.dup.name1",
+            ),
+            files=_build_files(),
+            headers=auth_headers,
+        )
+    assert resp1.status_code == 200
+
+    with patch("app.api.build.BUILDS_DIR", str(tmp_path)):
+        resp2 = client.post(
+            "/build",
+            data=_build_form_data(
+                h5_url="https://dup-name-2.example.com",
+                app_name="Duplicate Name",
+                android_package_name="com.dup.name2",
+            ),
+            files=_build_files(),
+            headers=auth_headers,
+        )
+    assert resp2.status_code == 409
+    assert "应用名称已被使用" in resp2.json()["detail"]
+
+
+def test_submit_build_rejects_duplicate_package_name(client, auth_headers, tmp_path):
+    with patch("app.api.build.BUILDS_DIR", str(tmp_path)), \
+         patch("app.api.build.run_scheduler_once", return_value={"promoted": 0, "dispatched": 0}), \
+         patch("app.api.build.refresh_request_status", return_value="submitted"), \
+         patch("app.api.build.estimate_request_wait_seconds", return_value=0):
+        resp1 = client.post(
+            "/build",
+            data=_build_form_data(
+                h5_url="https://dup-pkg-1.example.com",
+                app_name="App One",
+                android_package_name="com.dup.pkg",
+            ),
+            files=_build_files(),
+            headers=auth_headers,
+        )
+    assert resp1.status_code == 200
+
+    with patch("app.api.build.BUILDS_DIR", str(tmp_path)):
+        resp2 = client.post(
+            "/build",
+            data=_build_form_data(
+                h5_url="https://dup-pkg-2.example.com",
+                app_name="App Two",
+                android_package_name="com.dup.pkg",
+            ),
+            files=_build_files(),
+            headers=auth_headers,
+        )
+    assert resp2.status_code == 409
+    assert "包名已被使用" in resp2.json()["detail"]

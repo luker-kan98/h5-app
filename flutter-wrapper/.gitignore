@@ -52,6 +52,12 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Third-party SDK binaries (track AppVue SDK)
+# /android/app/libs/
+
+# Gradle cache
+/android/.gradle/
+
 # Android machine-specific files
 android/local.properties
 android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java

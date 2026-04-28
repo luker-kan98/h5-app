@@ -32,6 +32,12 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <meta-data
+            android:name="com.appvue.sdk.KEY"
+            android:value="3w4ldfzj" />
+        <meta-data
+            android:name="com.appvue.sdk.SECRET"
+            android:value="vu3w4ldfzj" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
