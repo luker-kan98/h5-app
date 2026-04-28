@@ -18,10 +18,10 @@ const TERMINAL_PLATFORM_STATUSES = new Set(["done", "failed", "cancelled"]);
 
 const PLATFORM_KEYS = ["android", "ios", "macos", "windows"];
 const PLATFORM_ICONS = {
-  android: "/images/h5-package/android-icon.png",
-  ios: "/images/h5-package/ios-icon.png",
-  macos: "/images/h5-package/macos-icon.png",
-  windows: "/images/h5-package/windows-icon.png",
+  android: "/images/h5-package/ic_android.svg",
+  ios: "/images/h5-package/ic_apple.svg",
+  macos: "/images/h5-package/ic_macos.svg",
+  windows: "/images/h5-package/ic_win.svg",
 };
 
 const FEATURE_DEFS = [
