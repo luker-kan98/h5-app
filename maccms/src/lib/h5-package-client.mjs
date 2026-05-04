@@ -10,7 +10,14 @@ export function sanitizeApiBaseUrl(value) {
 export function getApiBaseUrl(
   envValue = process.env.NEXT_PUBLIC_H5_PACKAGE_API_BASE_URL,
 ) {
-  return sanitizeApiBaseUrl(envValue);
+  const fromEnv = sanitizeApiBaseUrl(envValue);
+  if (fromEnv) {
+    return fromEnv;
+  }
+  if (typeof window !== "undefined") {
+    return `${window.location.protocol}//${window.location.hostname}:8000`;
+  }
+  return "";
 }
 
 export function resolveApiUrl(path, apiBaseUrl = getApiBaseUrl()) {
