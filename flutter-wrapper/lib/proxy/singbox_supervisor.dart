@@ -91,7 +91,11 @@ class SingboxSupervisor {
       if (!_gaveUp.isCompleted) _gaveUp.complete();
       return;
     }
-    _spawn();
+    // Fire-and-forget restart, but route any exception (file write failure,
+    // factory throw) into gaveUp so callers waiting on it don't hang.
+    _spawn().catchError((Object e, StackTrace st) {
+      if (!_gaveUp.isCompleted) _gaveUp.completeError(e, st);
+    });
   }
 
   String _renderConfig(ProxyNode node) {
