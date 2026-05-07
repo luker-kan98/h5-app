@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -109,3 +111,58 @@ def _js_safe_literal(json_text: str) -> str:
     that would break any `const X = "..."` containing them. Escape them.
     """
     return json_text.replace(chr(0x2028), "\\u2028").replace(chr(0x2029), "\\u2029")
+
+
+# parents[2] of backend/app/services/sdk_injector.py == backend/, so the
+# default vendor tree lives at backend/vendor/singbox/.
+DEFAULT_SINGBOX_VENDOR_DIR = Path(__file__).resolve().parents[2] / "vendor" / "singbox"
+
+
+def _vendor_dir(override: Path | str | None) -> Path:
+    if override is not None:
+        return Path(override)
+    return DEFAULT_SINGBOX_VENDOR_DIR
+
+
+def copy_singbox_for_flutter(
+    flutter_dir: str | Path,
+    vendor_dir: Path | str | None = None,
+) -> None:
+    """Copy the three Android sing-box binaries into the Flutter wrapper jniLibs.
+
+    Each binary is renamed to `libsingbox.so` so Android's native-libs packaging
+    picks it up when assembling the APK.
+    """
+    vendor = _vendor_dir(vendor_dir)
+    base = Path(flutter_dir) / "android/app/src/main/jniLibs"
+    for abi in ("arm64-v8a", "armeabi-v7a", "x86_64"):
+        src = vendor / "android" / abi / "sing-box"
+        if not src.exists():
+            raise FileNotFoundError(f"sing-box ABI {abi} missing at {src}")
+        dst = base / abi / "libsingbox.so"
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, dst)
+        os.chmod(dst, 0o755)
+
+
+def copy_singbox_for_electron(
+    electron_dir: str | Path,
+    target_platform: str,
+    vendor_dir: Path | str | None = None,
+) -> None:
+    """Copy the platform-specific sing-box binary into resources/singbox/."""
+    vendor = _vendor_dir(vendor_dir)
+    if target_platform == "macos":
+        src = vendor / "darwin" / "sing-box"
+        dst_name = "sing-box"
+    elif target_platform == "windows":
+        src = vendor / "windows" / "sing-box.exe"
+        dst_name = "sing-box.exe"
+    else:
+        raise ValueError(f"unsupported electron target_platform: {target_platform!r}")
+    if not src.exists():
+        raise FileNotFoundError(f"sing-box binary missing at {src}")
+    dst = Path(electron_dir) / "resources/singbox" / dst_name
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(src, dst)
+    os.chmod(dst, 0o755)
