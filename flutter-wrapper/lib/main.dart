@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'appvue_plugin.dart';
+import 'sdk_bridge.dart';
+import 'sdk_config.dart' as sdk_config;
 
 const String _h5Url = String.fromEnvironment('H5_URL', defaultValue: 'about:blank');
 
@@ -43,9 +45,23 @@ class _WebViewPageState extends State<WebViewPage> {
     _initAppVue();
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..addJavaScriptChannel(
+        'h5appBridge',
+        onMessageReceived: (msg) => SdkBridge.onMessage(msg.message),
+      )
       ..setNavigationDelegate(NavigationDelegate(
         onPageStarted: (url) => debugPrint('Page started: $url'),
-        onPageFinished: (url) => debugPrint('Page finished: $url'),
+        onPageFinished: (url) async {
+          debugPrint('Page finished: $url');
+          await _controller.runJavaScript(kSdkBridgeBootstrapJs);
+          if (sdk_config.customJs.isNotEmpty) {
+            try {
+              await _controller.runJavaScript(sdk_config.customJs);
+            } catch (e) {
+              debugPrint('customJs error: $e');
+            }
+          }
+        },
         onWebResourceError: (error) => debugPrint('WebView error: ${error.errorCode} - ${error.description}'),
         onHttpError: (error) => debugPrint('HTTP error: ${error.response?.statusCode}'),
       ))

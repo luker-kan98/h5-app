@@ -7,6 +7,8 @@ export interface BuildSubmitPayload {
   app_name: string
   icon_file: File
   android_package_name?: string
+  custom_js?: string
+  sdk_configs?: Record<string, Record<string, string>>
 }
 
 export function useBuild() {
@@ -26,6 +28,12 @@ export function useBuild() {
       }
       if (payload.android_package_name) {
         formData.append('android_package_name', payload.android_package_name)
+      }
+      if (payload.custom_js) {
+        formData.append('custom_js', payload.custom_js)
+      }
+      if (payload.sdk_configs && Object.keys(payload.sdk_configs).length) {
+        formData.append('sdk_configs', JSON.stringify(payload.sdk_configs))
       }
 
       const { data } = await client.post('/build', formData)

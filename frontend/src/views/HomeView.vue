@@ -42,6 +42,7 @@
           <p class="mt-1 text-xs text-gray-500">Upload a square PNG that is at least 1024x1024. The server will resize it for each platform.</p>
           <p v-if="iconFile" class="mt-1 text-xs text-gray-500">Selected: {{ iconFile.name }}</p>
         </div>
+        <SdkConfigSection :selected-platforms="selectedPlatforms" @update="onSdkUpdate" />
         <p v-if="displayError" class="text-red-500 text-sm">{{ displayError }}</p>
         <button @click="submit" :disabled="!canSubmit"
           class="w-full bg-blue-600 text-white rounded py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
@@ -57,6 +58,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useBuild } from '@/composables/useBuild'
+import SdkConfigSection from '@/components/SdkConfigSection.vue'
 
 const { logout } = useAuth()
 const { submitBuild, loading, error } = useBuild()
@@ -68,6 +70,13 @@ const androidPackageName = ref('')
 const iconFile = ref<File | null>(null)
 const formError = ref<string | null>(null)
 const selectedPlatforms = ref<string[]>(['android'])
+const customJs = ref('')
+const sdkConfigs = ref<Record<string, Record<string, string>>>({})
+
+function onSdkUpdate(payload: { customJs: string; sdkConfigs: Record<string, Record<string, string>> }) {
+  customJs.value = payload.customJs
+  sdkConfigs.value = payload.sdkConfigs
+}
 const allPlatforms = [
   { value: 'android', label: 'Android' },
   { value: 'ios', label: 'iOS (unsigned)' },
@@ -169,6 +178,8 @@ async function submit() {
       app_name: appName.value.trim(),
       icon_file: iconFile.value,
       android_package_name: isAndroidSelected.value ? androidPackageName.value.trim() : undefined,
+      custom_js: customJs.value || undefined,
+      sdk_configs: Object.keys(sdkConfigs.value).length ? sdkConfigs.value : undefined,
     })
     router.push(`/task/${taskId}`)
   } catch {
