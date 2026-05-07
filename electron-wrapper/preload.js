@@ -1,4 +1,4 @@
-const { contextBridge } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron');
 
 // Unified JS bridge — same surface as the Flutter side. Default no-ops; per-SDK
 // handlers (Sentry etc.) will be wired in later increments.
@@ -22,4 +22,8 @@ contextBridge.exposeInMainWorld('h5app', {
       console.debug('[h5app.crash.captureMessage]', msg);
     },
   },
+});
+
+contextBridge.exposeInMainWorld('electronProxyRetry', () => {
+  ipcRenderer.invoke('proxy:retry');
 });

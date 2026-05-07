@@ -20,6 +20,9 @@
   "build": {
     "appId": "com.h5packager.app",
     "productName": "H5 App",
+    "extraResources": [
+      { "from": "resources/singbox", "to": "singbox", "filter": ["**/*"] }
+    ],
     "mac": {
       "target": "dmg"
     },
