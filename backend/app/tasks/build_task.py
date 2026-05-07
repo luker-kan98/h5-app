@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models.build_job import BuildJob
 from app.models.build_request import BuildRequest
+from app.models.build_sdk_config import BuildSdkConfig
 from app.models.build_task import BuildTask
 from app.services.file_service import artifact_dir, artifact_path, PLATFORM_FILENAMES
 from app.services.icon_service import (
@@ -28,6 +29,7 @@ from app.services.icon_service import (
 from app.services.build_scheduler import refresh_request_status, run_scheduler_once
 from app.services.runtime_schema import ensure_build_task_artifact_columns
 from app.services.s3_service import s3_upload_configured, upload_build_artifact
+from app.services import sdk_injector
 
 celery_app = Celery("h5packager")
 celery_app.config_from_object("celeryconfig")
@@ -95,6 +97,8 @@ def _prepare_electron(
     icon_path: Optional[str],
     tmp_dir: str,
     platforms: list[str],
+    custom_js: Optional[str] = None,
+    sdk_configs: Optional[dict] = None,
 ) -> str:
     """Copy electron-wrapper to tmp_dir, inject settings, run npm install. Returns the working dir."""
     electron_dir = os.path.join(tmp_dir, "electron")
@@ -107,6 +111,13 @@ def _prepare_electron(
     content = content.replace("__H5_URL__", h5_url)
     with open(main_js, "w", encoding="utf-8") as f:
         f.write(content)
+
+    sdk_injector.apply_electron(electron_dir, custom_js, sdk_configs or {})
+    if sdk_configs and "proxy" in sdk_configs:
+        # _prepare_electron is invoked per platform; platforms holds exactly one entry.
+        target = platforms[0] if platforms else None
+        if target in ("macos", "windows"):
+            sdk_injector.copy_singbox_for_electron(electron_dir, target_platform=target)
 
     package_json_path = os.path.join(electron_dir, "package.json")
     with open(package_json_path, "r", encoding="utf-8") as f:
@@ -440,6 +451,17 @@ def execute_build_task(self, build_task_id: int):
         flutter_tmp = None
         electron_tmp = None
 
+        sdk_row = (
+            db.query(BuildSdkConfig)
+            .filter(BuildSdkConfig.request_id == request.id)
+            .first()
+        )
+        custom_js = sdk_row.custom_js if sdk_row else None
+        try:
+            sdk_configs = json.loads(sdk_row.sdk_configs) if sdk_row else {}
+        except (TypeError, json.JSONDecodeError):
+            sdk_configs = {}
+
         if need_flutter:
             flutter_tmp = os.path.join(tmp_dir, "flutter")
 
@@ -456,6 +478,9 @@ def execute_build_task(self, build_task_id: int):
                 request.icon_path,
                 request.android_package_name,
             )
+            sdk_injector.apply_flutter(flutter_tmp, custom_js, sdk_configs)
+            if sdk_configs and "proxy" in sdk_configs:
+                sdk_injector.copy_singbox_for_flutter(flutter_tmp)
             _run(["flutter", "pub", "get"], cwd=flutter_tmp)
 
         if need_electron:
@@ -465,6 +490,8 @@ def execute_build_task(self, build_task_id: int):
                 request.icon_path,
                 tmp_dir,
                 [platform],
+                custom_js=custom_js,
+                sdk_configs=sdk_configs,
             )
 
         os.makedirs(artifact_dir(request.request_id), exist_ok=True)
