@@ -48,10 +48,16 @@ def test_parse_empty_returns_empty_dict():
 
 
 def test_parse_rejects_too_large():
-    big = "x" * (10 * 1024 + 1)
+    big = "x" * (50 * 1024 + 1)
     payload = json.dumps({"sentry": {"dsn": big}})
     with pytest.raises(SdkValidationError):
         parse_sdk_configs(payload)
+
+
+def test_parse_accepts_up_to_50kb():
+    # 50 KB exactly is allowed; only strictly > 50 KB is rejected.
+    payload = json.dumps({"sentry": {"dsn": "x" * (50 * 1024 - 64)}})
+    parse_sdk_configs(payload)  # should not raise
 
 
 def test_parse_rejects_non_object():

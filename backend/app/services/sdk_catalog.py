@@ -124,7 +124,7 @@ CATALOG: dict[str, SdkDefinition] = {
 }
 
 
-SDK_CONFIGS_MAX_BYTES = 10 * 1024
+SDK_CONFIGS_MAX_BYTES = 50 * 1024
 CUSTOM_JS_MAX_BYTES = 50 * 1024
 
 
@@ -157,7 +157,7 @@ def parse_sdk_configs(raw: str | None) -> dict[str, dict[str, Any]]:
     if raw is None or raw.strip() == "":
         return {}
     if len(raw.encode("utf-8")) > SDK_CONFIGS_MAX_BYTES:
-        raise SdkValidationError("sdk_configs payload too large (max 10KB)")
+        raise SdkValidationError("sdk_configs payload too large (max 50KB)")
     try:
         data = json.loads(raw)
     except json.JSONDecodeError as e:
