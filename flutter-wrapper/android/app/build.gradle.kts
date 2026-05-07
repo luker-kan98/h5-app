@@ -47,6 +47,7 @@ android {
 
 dependencies {
     implementation(files("libs/appvue-v1.0.0-release.aar"))
+    implementation("androidx.webkit:webkit:1.10.0")
 }
 
 flutter {
