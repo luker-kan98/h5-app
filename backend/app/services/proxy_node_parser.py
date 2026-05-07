@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import base64
 import binascii
+# `json` and `yaml` are imported now and used by parse_node_line / validate_node_dict
+# in a follow-up task; left here so the module's import surface is stable.
 import json
 from dataclasses import dataclass, asdict
 from typing import Any
@@ -54,19 +56,27 @@ class ProxyNode:
 
 
 def _decode_b64_lenient(data: str) -> bytes:
-    """Decode standard or url-safe base64, padding-tolerant."""
+    """Decode base64 userinfo from an SS URI.
+
+    SS URIs nominally use url-safe base64 (no `+` or `/`), but some clients
+    emit standard base64. We pick the alphabet by inspecting the input rather
+    than blindly retrying — `urlsafe_b64decode` will silently mis-decode
+    `+` and `/` if used as the first attempt.
+    """
     s = data.strip()
     s_padded = s + "=" * (-len(s) % 4)
+    has_std_chars = "+" in s or "/" in s
+    decoder = base64.b64decode if has_std_chars else base64.urlsafe_b64decode
     try:
-        return base64.urlsafe_b64decode(s_padded)
-    except (binascii.Error, ValueError):
-        try:
-            return base64.b64decode(s_padded)
-        except (binascii.Error, ValueError) as e:
-            raise ProxyNodeError(f"invalid base64 in SS URI: {e}") from e
+        return decoder(s_padded)
+    except (binascii.Error, ValueError) as e:
+        raise ProxyNodeError(f"invalid base64 in SS URI: {e}") from e
 
 
 def _validate(node: ProxyNode) -> ProxyNode:
+    """Validate a ProxyNode in place. Mutates `node.name` to a sensible
+    default (`"server:port"`) when empty. Returns the same instance.
+    """
     if node.type not in ALLOWED_TYPES:
         raise ProxyNodeError(f"unsupported type {node.type!r} (only 'ss' is supported)")
     if not node.server:
@@ -105,6 +115,10 @@ def parse_ss_uri(uri: str) -> ProxyNode:
         port = parsed.port or 0
     except ValueError as e:
         raise ProxyNodeError(f"invalid port in SS URI: {e}") from e
+    if parsed.path and parsed.path != "/":
+        raise ProxyNodeError(
+            f"unexpected path in SS URI: {parsed.path!r}"
+        )
     fragment = unquote(parsed.fragment) if parsed.fragment else ""
 
     return _validate(
