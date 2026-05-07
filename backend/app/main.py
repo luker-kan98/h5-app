@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import app.models
 from app.database import Base, engine
-from app.api import auth, build
+from app.api import auth, build, sdk_catalog
 from app.services.runtime_schema import (
     ensure_build_task_artifact_columns,
     ensure_host_sample_bigint_columns,
@@ -26,6 +26,7 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(build.router, tags=["build"])
+app.include_router(sdk_catalog.router, tags=["sdk"])
 
 BUILDS_DIR = os.getenv("BUILDS_DIR", "./builds")
 os.makedirs(BUILDS_DIR, exist_ok=True)

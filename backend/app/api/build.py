@@ -12,6 +12,7 @@ from app.dependencies import get_db, get_current_user
 from app.i18n import t
 from app.models.build_job import BuildJob
 from app.models.build_request import BuildRequest
+from app.models.build_sdk_config import BuildSdkConfig
 from app.models.build_task import BuildTask
 from app.models.user import User
 from app.schemas import BuildSubmitResponse, BuildStatusResponse, HistoryItem
@@ -23,6 +24,12 @@ from app.services.build_scheduler import (
     run_scheduler_once,
 )
 from app.services.resource_guard import resource_profile_name
+from app.services.sdk_catalog import (
+    SdkValidationError,
+    parse_sdk_configs,
+    validate_custom_js,
+    validate_sdk_configs,
+)
 from app.services.url_validator import validate_h5_url, UrlValidationError
 
 VALID_PLATFORMS = {"android", "ios", "macos", "windows"}
@@ -43,6 +50,8 @@ async def submit_build(
     keystore_password: Optional[str] = Form(None),
     key_alias: Optional[str] = Form(None),
     key_password: Optional[str] = Form(None),
+    custom_js: Optional[str] = Form(None),
+    sdk_configs: Optional[str] = Form(None),
     language: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -100,6 +109,13 @@ async def submit_build(
     except IconValidationError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
+    try:
+        validated_custom_js = validate_custom_js(custom_js)
+        parsed_sdk_configs = parse_sdk_configs(sdk_configs)
+        validated_sdk_configs = validate_sdk_configs(parsed_sdk_configs, list(platforms))
+    except SdkValidationError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
     keystore_contents = None
     if keystore_file is not None:
         keystore_contents = await keystore_file.read()
@@ -139,6 +155,14 @@ async def submit_build(
         build_request.keystore_password = keystore_password or "changeit"
         build_request.key_alias = key_alias or "h5packager"
         build_request.key_password = key_password or "changeit"
+
+    if validated_custom_js or validated_sdk_configs:
+        sdk_row = BuildSdkConfig(
+            request_id=build_request.id,
+            custom_js=validated_custom_js,
+            sdk_configs=json.dumps(validated_sdk_configs, ensure_ascii=False),
+        )
+        db.add(sdk_row)
 
     tasks = [
         BuildTask(
@@ -212,6 +236,20 @@ def rebuild(
     db.add(new_request)
     db.commit()
     db.refresh(new_request)
+
+    original_sdk = (
+        db.query(BuildSdkConfig)
+        .filter(BuildSdkConfig.request_id == original.id)
+        .first()
+    )
+    if original_sdk is not None:
+        db.add(
+            BuildSdkConfig(
+                request_id=new_request.id,
+                custom_js=original_sdk.custom_js,
+                sdk_configs=original_sdk.sdk_configs,
+            )
+        )
 
     tasks = [
         BuildTask(
