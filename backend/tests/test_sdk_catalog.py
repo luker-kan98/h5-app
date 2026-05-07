@@ -153,3 +153,6 @@ def test_catalog_serializes_widget_fields():
             assert "widget" in field
             assert "placeholder" in field
             assert "help_zh" in field
+            # Existing SDKs default to widget="text"; ensure the default value
+            # round-trips through serialization, not just the key presence.
+            assert field["widget"] == "text"
