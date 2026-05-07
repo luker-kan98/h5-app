@@ -154,11 +154,44 @@ def test_field_widget_defaults_and_extension():
 def test_catalog_serializes_widget_fields():
     from app.services.sdk_catalog import catalog_as_dict
     payload = catalog_as_dict()
+    valid_widgets = {"text", "textarea", "number", "checkbox"}
     for sdk in payload["sdks"]:
         for field in sdk["fields"]:
             assert "widget" in field
             assert "placeholder" in field
             assert "help_zh" in field
-            # Existing SDKs default to widget="text"; ensure the default value
-            # round-trips through serialization, not just the key presence.
-            assert field["widget"] == "text"
+            assert field["widget"] in valid_widgets
+    # Verify the widget="text" default round-trips through serialization
+    # (not just key presence) on at least one SDK that uses defaults.
+    sentry = next(s for s in payload["sdks"] if s["id"] == "sentry")
+    assert all(f["widget"] == "text" for f in sentry["fields"])
+
+
+def test_proxy_sdk_in_catalog():
+    assert "proxy" in CATALOG
+    proxy = CATALOG["proxy"]
+    assert proxy.category == "network"
+    assert set(proxy.supported_platforms) == {"android", "macos", "windows"}
+    field_names = {f.name for f in proxy.fields}
+    assert field_names == {
+        "ossUrls",
+        "updateIntervalHours",
+        "dnsTxtDomains",
+        "builtinProxies",
+        "disableDirect",
+    }
+
+
+def test_proxy_sdk_widget_assignment():
+    proxy = CATALOG["proxy"]
+    by_name = {f.name: f for f in proxy.fields}
+    assert by_name["ossUrls"].widget == "textarea"
+    assert by_name["updateIntervalHours"].widget == "number"
+    assert by_name["dnsTxtDomains"].widget == "textarea"
+    assert by_name["builtinProxies"].widget == "textarea"
+    assert by_name["builtinProxies"].secret is True
+    assert by_name["disableDirect"].widget == "checkbox"
+
+
+def test_network_category_valid():
+    assert "network" in VALID_CATEGORIES

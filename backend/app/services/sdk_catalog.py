@@ -7,7 +7,7 @@ from typing import Any
 
 
 VALID_PLATFORMS = {"android", "ios", "macos", "windows"}
-VALID_CATEGORIES = {"analytics", "crash", "push"}
+VALID_CATEGORIES = {"analytics", "crash", "push", "network"}
 
 
 @dataclass(frozen=True)
@@ -118,6 +118,61 @@ CATALOG: dict[str, SdkDefinition] = {
                 label_zh="GoogleService-Info.plist (base64)",
                 secret=True,
                 platforms=("ios",),
+            ),
+        ),
+    ),
+    "proxy": SdkDefinition(
+        id="proxy",
+        name_en="Network Proxy",
+        name_zh="网络代理",
+        category="network",
+        supported_platforms=("android", "macos", "windows"),
+        fields=(
+            SdkField(
+                name="ossUrls",
+                label_en="OSS Config URLs",
+                label_zh="OSS 地址",
+                help_zh="(一行一个)",
+                required=False,
+                widget="textarea",
+                placeholder="https://example.com/config.json",
+            ),
+            SdkField(
+                name="updateIntervalHours",
+                label_en="Cloud Update Interval (hours)",
+                label_zh="云端更新间隔",
+                help_zh="(小时)",
+                required=False,
+                widget="number",
+                placeholder="1",
+            ),
+            SdkField(
+                name="dnsTxtDomains",
+                label_en="DNS TXT Domains",
+                label_zh="DNS TXT 域名",
+                help_zh="(一行一个)",
+                required=False,
+                widget="textarea",
+            ),
+            SdkField(
+                name="builtinProxies",
+                label_en="Built-in Proxies",
+                label_zh="内建代理",
+                help_zh="(一行一个,Clash 节点格式或 JSON)",
+                required=False,
+                widget="textarea",
+                secret=True,
+                placeholder=(
+                    "{ name: 'hk', type: ss, server: ..., port: ..., "
+                    "cipher: aes-256-gcm, password: ... }"
+                ),
+            ),
+            SdkField(
+                name="disableDirect",
+                label_en="Disable Direct Connection",
+                label_zh="禁用直连",
+                required=False,
+                widget="checkbox",
             ),
         ),
     ),
