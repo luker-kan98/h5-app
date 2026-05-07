@@ -8,7 +8,6 @@ from typing import Any
 from urllib.parse import urlparse
 
 from app.services.proxy_node_parser import (
-    ProxyNode,
     ProxyNodeError,
     parse_node_line,
 )
@@ -245,8 +244,16 @@ _DOMAIN_RE = re.compile(
 
 
 def _split_lines(value: Any) -> list[str]:
+    """Split a textarea value into trimmed non-empty lines.
+
+    Accepts either a string (typical form upload) or a list of strings
+    (clients posting JSON arrays). Other types fall through to ``str()``
+    coercion, which yields a single-element list useful for diagnostics.
+    """
     if value is None:
         return []
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
     text = str(value)
     return [line.strip() for line in text.splitlines() if line.strip()]
 
