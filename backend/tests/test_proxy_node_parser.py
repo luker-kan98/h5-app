@@ -89,3 +89,87 @@ def test_decode_b64_lenient_handles_standard_alphabet_with_plus():
     encoded = base64.b64encode(b"\xfb").decode()  # "+w==" — starts with '+'
     decoded = _decode_b64_lenient(encoded)
     assert decoded == b"\xfb"
+
+
+def test_validate_node_dict_strict_json_shape():
+    from app.services.proxy_node_parser import validate_node_dict
+    node = validate_node_dict({
+        "name": "hk-1",
+        "type": "ss",
+        "server": "hk.example.com",
+        "port": 8388,
+        "cipher": "aes-256-gcm",
+        "password": "pw",
+        "udp": True,
+    })
+    assert node.name == "hk-1"
+    assert node.udp is True
+
+
+def test_validate_node_dict_missing_required_field():
+    from app.services.proxy_node_parser import validate_node_dict
+    with pytest.raises(ProxyNodeError):
+        validate_node_dict({"name": "x", "type": "ss", "server": "h"})  # no port etc
+
+
+def test_validate_node_dict_coerces_string_port():
+    from app.services.proxy_node_parser import validate_node_dict
+    node = validate_node_dict({
+        "name": "x", "type": "ss", "server": "h", "port": "8388",
+        "cipher": "aes-256-gcm", "password": "pw",
+    })
+    assert node.port == 8388
+
+
+def test_parse_node_line_strict_json():
+    from app.services.proxy_node_parser import parse_node_line
+    line = (
+        '{"name":"hk","type":"ss","server":"h","port":8388,'
+        '"cipher":"aes-256-gcm","password":"pw"}'
+    )
+    node = parse_node_line(line)
+    assert node.name == "hk"
+    assert node.password == "pw"
+
+
+def test_parse_node_line_clash_yaml_inline():
+    from app.services.proxy_node_parser import parse_node_line
+    line = (
+        "{ name: 'hk proxy', type: ss, server: hk.happynode.vip, "
+        "port: 31870, cipher: aes-256-gcm, "
+        "password: c9af03f5-7f13-43cf-8b3c-ad3e7f90f62c, udp: true }"
+    )
+    node = parse_node_line(line)
+    assert node.name == "hk proxy"
+    assert node.server == "hk.happynode.vip"
+    assert node.port == 31870
+    assert node.udp is True
+
+
+def test_parse_node_line_dispatches_ss_uri():
+    from app.services.proxy_node_parser import parse_node_line
+    import base64
+    payload = base64.b64encode(b"aes-256-gcm:pw").decode().rstrip("=")
+    node = parse_node_line(f"ss://{payload}@example.com:8388#myname")
+    assert node.cipher == "aes-256-gcm"
+    assert node.name == "myname"
+
+
+def test_parse_node_line_rejects_unknown_format():
+    from app.services.proxy_node_parser import parse_node_line
+    with pytest.raises(ProxyNodeError):
+        parse_node_line("not a node at all")
+
+
+def test_parse_node_line_strips_whitespace():
+    from app.services.proxy_node_parser import parse_node_line
+    line = '   {"name":"x","type":"ss","server":"h","port":1,"cipher":"aes-256-gcm","password":"pw"}   '
+    parse_node_line(line)
+
+
+def test_parse_node_line_yaml_after_json_failure():
+    """A line starting with '{' that isn't strict JSON should fall back to YAML."""
+    from app.services.proxy_node_parser import parse_node_line
+    line = "{name: x, type: ss, server: h, port: 1, cipher: aes-256-gcm, password: pw}"
+    node = parse_node_line(line)
+    assert node.name == "x"

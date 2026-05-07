@@ -11,8 +11,6 @@ from __future__ import annotations
 
 import base64
 import binascii
-# `json` and `yaml` are imported now and used by parse_node_line / validate_node_dict
-# in a follow-up task; left here so the module's import surface is stable.
 import json
 from dataclasses import dataclass, asdict
 from typing import Any
@@ -134,4 +132,82 @@ def parse_ss_uri(uri: str) -> ProxyNode:
     )
 
 
-# parse_node_line, validate_node_dict, parse_clash_inline added in later tasks.
+def _coerce_int(value: Any, field_name: str) -> int:
+    if isinstance(value, bool):
+        # bool is a subclass of int — reject explicitly.
+        raise ProxyNodeError(f"{field_name} must be an integer, got bool")
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value, 10)
+        except ValueError as e:
+            raise ProxyNodeError(f"{field_name} not an integer: {value!r}") from e
+    raise ProxyNodeError(f"{field_name} must be an integer, got {type(value).__name__}")
+
+
+def _coerce_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        v = value.strip().lower()
+        if v in ("true", "1", "yes"):
+            return True
+        if v in ("false", "0", "no", ""):
+            return False
+    return False
+
+
+def validate_node_dict(d: dict[str, Any]) -> ProxyNode:
+    """Validate a dict (from JSON or YAML) into a ProxyNode."""
+    if not isinstance(d, dict):
+        raise ProxyNodeError(f"expected mapping, got {type(d).__name__}")
+
+    required = ("type", "server", "port", "cipher", "password")
+    missing = [k for k in required if k not in d]
+    if missing:
+        raise ProxyNodeError(f"missing required field(s): {', '.join(missing)}")
+
+    name = str(d.get("name") or "").strip()
+    type_ = str(d["type"]).strip()
+    server = str(d["server"]).strip()
+    port = _coerce_int(d["port"], "port")
+    cipher = str(d["cipher"]).strip()
+    password = str(d["password"])
+    udp = _coerce_bool(d.get("udp", False))
+
+    return _validate(
+        ProxyNode(
+            name=name,
+            type=type_,
+            server=server,
+            port=port,
+            cipher=cipher,
+            password=password,
+            udp=udp,
+        )
+    )
+
+
+def parse_node_line(raw: str) -> ProxyNode:
+    """Auto-detect format and parse a single line into a ProxyNode."""
+    line = raw.strip()
+    if not line:
+        raise ProxyNodeError("empty line")
+
+    if line.startswith("ss://"):
+        return parse_ss_uri(line)
+
+    if line.startswith("{"):
+        try:
+            data = json.loads(line)
+        except json.JSONDecodeError:
+            try:
+                data = yaml.safe_load(line)
+            except yaml.YAMLError as e:
+                raise ProxyNodeError(f"invalid JSON/YAML: {e}") from e
+        if not isinstance(data, dict):
+            raise ProxyNodeError("node must be a JSON/YAML object")
+        return validate_node_dict(data)
+
+    raise ProxyNodeError(f"unrecognized node format: {line[:40]!r}")
