@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+
+import 'proxy/proxy_runtime.dart';
 
 /// Dispatches messages from the H5 page's `window.h5app.*` JS bridge to the
 /// active native SDK handlers. For v1 plumbing this is a logging no-op; per-SDK
@@ -18,6 +21,9 @@ class SdkBridge {
     final method = payload['method'] as String?;
     final args = payload['args'];
     debugPrint('SdkBridge call: $namespace.$method($args)');
+    if (namespace == 'proxy' && method == 'retry') {
+      unawaited(ProxyRuntime.instance.retry());
+    }
   }
 }
 

@@ -27,6 +27,15 @@ class MainActivity : FlutterActivity() {
 
         flutterEngine.plugins.add(ProxyControllerPlugin())
 
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "h5_app/native_lib_dir")
+            .setMethodCallHandler { call, result ->
+                if (call.method == "get") {
+                    result.success(applicationInfo.nativeLibraryDir)
+                } else {
+                    result.notImplemented()
+                }
+            }
+
         channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         channel?.setMethodCallHandler { call, result ->
             when (call.method) {

@@ -1,18 +1,41 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'appvue_plugin.dart';
+import 'proxy/error_page.dart';
+import 'proxy/proxy_runtime.dart';
 import 'sdk_bridge.dart';
 import 'sdk_config.dart' as sdk_config;
 
 const String _h5Url = String.fromEnvironment('H5_URL', defaultValue: 'about:blank');
 
-void main() {
+Map<String, dynamic>? _parseProxyConfig() {
+  const raw = sdk_config.proxyConfigJson;
+  if (raw.isEmpty) return null;
+  try {
+    return jsonDecode(raw) as Map<String, dynamic>;
+  } catch (_) {
+    return null;
+  }
+}
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   AppVuePlugin.setup(
     onWakeupData: (data) {
       debugPrint('AppVue wakeup: $data');
     },
   );
+
+  final proxyCfg = _parseProxyConfig();
+  if (proxyCfg != null) {
+    try {
+      await ProxyRuntime.instance.start(config: proxyCfg, h5Url: _h5Url);
+    } catch (e) {
+      debugPrint('proxy start failed: $e');
+    }
+  }
   runApp(const H5App());
 }
 
@@ -64,8 +87,16 @@ class _WebViewPageState extends State<WebViewPage> {
         },
         onWebResourceError: (error) => debugPrint('WebView error: ${error.errorCode} - ${error.description}'),
         onHttpError: (error) => debugPrint('HTTP error: ${error.response?.statusCode}'),
-      ))
-      ..loadRequest(Uri.parse(_h5Url));
+      ));
+
+    final proxyEnabled = sdk_config.proxyConfigJson.isNotEmpty;
+    final proxyHealthy = ProxyRuntime.instance.isHealthy;
+    final disableDirect = ProxyRuntime.instance.disableDirect;
+    if (proxyEnabled && !proxyHealthy && disableDirect) {
+      _controller.loadHtmlString(proxyErrorHtml);
+    } else {
+      _controller.loadRequest(Uri.parse(_h5Url));
+    }
   }
 
   Future<void> _initAppVue() async {
