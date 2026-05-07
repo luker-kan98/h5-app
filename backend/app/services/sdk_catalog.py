@@ -2,8 +2,16 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import asdict, dataclass, field
 from typing import Any
+from urllib.parse import urlparse
+
+from app.services.proxy_node_parser import (
+    ProxyNode,
+    ProxyNodeError,
+    parse_node_line,
+)
 
 
 VALID_PLATFORMS = {"android", "ios", "macos", "windows"}
@@ -230,6 +238,72 @@ def validate_custom_js(raw: str | None) -> str | None:
     return raw
 
 
+_DOMAIN_RE = re.compile(
+    r"^(?=.{1,253}$)(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+"
+    r"[a-zA-Z]{2,}$"
+)
+
+
+def _split_lines(value: Any) -> list[str]:
+    if value is None:
+        return []
+    text = str(value)
+    return [line.strip() for line in text.splitlines() if line.strip()]
+
+
+def _normalize_proxy(fields: dict[str, Any]) -> dict[str, Any]:
+    oss_urls = _split_lines(fields.get("ossUrls"))
+    for u in oss_urls:
+        parsed = urlparse(u)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            raise SdkValidationError(f"invalid OSS URL: {u!r}")
+
+    dns_txt = _split_lines(fields.get("dnsTxtDomains"))
+    for d in dns_txt:
+        if not _DOMAIN_RE.match(d):
+            raise SdkValidationError(f"invalid DNS TXT domain: {d!r}")
+
+    builtin_lines = _split_lines(fields.get("builtinProxies"))
+    builtin_nodes: list[dict[str, Any]] = []
+    for idx, line in enumerate(builtin_lines, start=1):
+        try:
+            node = parse_node_line(line)
+        except ProxyNodeError as e:
+            raise SdkValidationError(f"builtinProxies line {idx}: {e}") from e
+        builtin_nodes.append(node.to_dict())
+
+    if not (oss_urls or dns_txt or builtin_nodes):
+        raise SdkValidationError(
+            "proxy SDK requires at least one of ossUrls / dnsTxtDomains / builtinProxies"
+        )
+
+    raw_interval = fields.get("updateIntervalHours")
+    if raw_interval in (None, ""):
+        interval = 1.0
+    else:
+        try:
+            interval = float(raw_interval)
+        except (TypeError, ValueError) as e:
+            raise SdkValidationError(
+                f"updateIntervalHours not a number: {raw_interval!r}"
+            ) from e
+    if not (0.1 <= interval <= 168.0):
+        raise SdkValidationError(
+            f"updateIntervalHours out of range [0.1, 168]: {interval}"
+        )
+
+    raw_disable = fields.get("disableDirect", "false")
+    disable_direct = str(raw_disable).strip().lower() in ("true", "1", "yes")
+
+    return {
+        "ossUrls": oss_urls,
+        "updateIntervalHours": interval,
+        "dnsTxtDomains": dns_txt,
+        "builtinProxies": builtin_nodes,
+        "disableDirect": disable_direct,
+    }
+
+
 def validate_sdk_configs(
     payload: dict[str, dict[str, Any]],
     requested_platforms: list[str],
@@ -254,6 +328,10 @@ def validate_sdk_configs(
                 f"SDK {sdk_id!r} does not support any of the selected platforms "
                 f"{sorted(requested)}; supported: {list(definition.supported_platforms)}"
             )
+
+        if sdk_id == "proxy":
+            cleaned[sdk_id] = _normalize_proxy(fields_value)
+            continue
 
         cleaned_fields: dict[str, Any] = {}
         allowed_field_names = {f.name for f in definition.fields}
