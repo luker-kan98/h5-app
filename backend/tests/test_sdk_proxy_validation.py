@@ -145,3 +145,15 @@ def test_proxy_supported_when_at_least_one_supported_platform_selected():
         ["ios", "android"],
     )
     assert "proxy" in cleaned
+
+
+def test_proxy_oss_urls_accepts_json_array():
+    """Clients that POST raw JSON may send ossUrls as a list rather than newlines."""
+    cleaned = _normalize({"proxy": {
+        "ossUrls": ["https://a.example.com/c.json", "https://b.example.com/c.json"],
+        "disableDirect": "true",
+    }})
+    assert cleaned["proxy"]["ossUrls"] == [
+        "https://a.example.com/c.json",
+        "https://b.example.com/c.json",
+    ]
