@@ -149,13 +149,18 @@ def _coerce_int(value: Any, field_name: str) -> int:
 def _coerce_bool(value: Any) -> bool:
     if isinstance(value, bool):
         return value
+    if isinstance(value, int):
+        # YAML emits `udp: 1` as int(1); accept and coerce. (bool is a subclass
+        # of int, but the bool branch above runs first — order matters.)
+        return bool(value)
     if isinstance(value, str):
         v = value.strip().lower()
         if v in ("true", "1", "yes"):
             return True
         if v in ("false", "0", "no", ""):
             return False
-    return False
+        raise ProxyNodeError(f"udp must be a boolean, got string {value!r}")
+    raise ProxyNodeError(f"udp must be a boolean, got {type(value).__name__}")
 
 
 def validate_node_dict(d: dict[str, Any]) -> ProxyNode:
@@ -201,11 +206,13 @@ def parse_node_line(raw: str) -> ProxyNode:
     if line.startswith("{"):
         try:
             data = json.loads(line)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as json_err:
             try:
                 data = yaml.safe_load(line)
-            except yaml.YAMLError as e:
-                raise ProxyNodeError(f"invalid JSON/YAML: {e}") from e
+            except yaml.YAMLError as yaml_err:
+                raise ProxyNodeError(
+                    f"invalid JSON ({json_err}); also invalid as YAML: {yaml_err}"
+                ) from json_err
         if not isinstance(data, dict):
             raise ProxyNodeError("node must be a JSON/YAML object")
         return validate_node_dict(data)

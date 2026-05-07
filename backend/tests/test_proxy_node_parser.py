@@ -173,3 +173,74 @@ def test_parse_node_line_yaml_after_json_failure():
     line = "{name: x, type: ss, server: h, port: 1, cipher: aes-256-gcm, password: pw}"
     node = parse_node_line(line)
     assert node.name == "x"
+
+
+def test_coerce_int_rejects_bool():
+    from app.services.proxy_node_parser import _coerce_int
+    with pytest.raises(ProxyNodeError):
+        _coerce_int(True, "port")
+    with pytest.raises(ProxyNodeError):
+        _coerce_int(False, "port")
+
+
+def test_coerce_int_rejects_float():
+    from app.services.proxy_node_parser import _coerce_int
+    with pytest.raises(ProxyNodeError):
+        _coerce_int(8388.0, "port")
+
+
+def test_coerce_bool_accepts_int():
+    from app.services.proxy_node_parser import _coerce_bool
+    assert _coerce_bool(1) is True
+    assert _coerce_bool(0) is False
+
+
+def test_coerce_bool_rejects_unknown_string():
+    from app.services.proxy_node_parser import _coerce_bool
+    with pytest.raises(ProxyNodeError):
+        _coerce_bool("maybe")
+
+
+def test_coerce_bool_rejects_none():
+    from app.services.proxy_node_parser import _coerce_bool
+    with pytest.raises(ProxyNodeError):
+        _coerce_bool(None)
+
+
+def test_validate_node_dict_yaml_int_udp():
+    from app.services.proxy_node_parser import validate_node_dict
+    node = validate_node_dict({
+        "type": "ss", "server": "h", "port": 1,
+        "cipher": "aes-256-gcm", "password": "pw",
+        "udp": 1,  # YAML int form
+    })
+    assert node.udp is True
+
+
+def test_parse_node_line_empty_raises():
+    from app.services.proxy_node_parser import parse_node_line
+    with pytest.raises(ProxyNodeError):
+        parse_node_line("")
+    with pytest.raises(ProxyNodeError):
+        parse_node_line("   ")
+
+
+def test_parse_node_line_malformed_brace_surfaces_json_error():
+    """JSON-like input with a typo should mention the JSON error, not just YAML."""
+    from app.services.proxy_node_parser import parse_node_line
+    with pytest.raises(ProxyNodeError) as exc:
+        # Intentional malformed JSON that's also malformed YAML
+        parse_node_line('{"type": "ss", "port": 8388, "cipher": @bad}')
+    msg = str(exc.value)
+    assert "invalid JSON" in msg
+
+
+def test_validate_node_dict_udp_null_yaml_raises():
+    """YAML `udp: null` previously produced udp=False silently; now strict."""
+    from app.services.proxy_node_parser import validate_node_dict
+    with pytest.raises(ProxyNodeError):
+        validate_node_dict({
+            "type": "ss", "server": "h", "port": 1,
+            "cipher": "aes-256-gcm", "password": "pw",
+            "udp": None,
+        })
