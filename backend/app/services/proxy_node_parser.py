@@ -117,6 +117,13 @@ def parse_ss_uri(uri: str) -> ProxyNode:
         raise ProxyNodeError(
             f"unexpected path in SS URI: {parsed.path!r}"
         )
+    if parsed.query:
+        # SIP002 plugin params (?plugin=obfs-local;obfs=tls) require runtime
+        # support we don't have. Reject explicitly so the user sees a clear
+        # 422 instead of silently shipping a node that cannot connect.
+        raise ProxyNodeError(
+            f"SS URI query strings (e.g. ?plugin=...) are not supported: {parsed.query!r}"
+        )
     fragment = unquote(parsed.fragment) if parsed.fragment else ""
 
     return _validate(

@@ -67,6 +67,23 @@ def test_parse_ss_uri_rejects_extra_path():
         parse_ss_uri(f"ss://{payload}@example.com:8388/extra")
 
 
+def test_parse_ss_uri_rejects_plugin_query():
+    """SIP002 ?plugin= parameters require runtime support we don't have."""
+    import base64
+    payload = base64.b64encode(b"aes-256-gcm:pw").decode().rstrip("=")
+    with pytest.raises(ProxyNodeError) as exc:
+        parse_ss_uri(f"ss://{payload}@example.com:8388?plugin=obfs-local;obfs=tls#hk")
+    assert "plugin" in str(exc.value).lower() or "query" in str(exc.value).lower()
+
+
+def test_parse_ss_uri_rejects_arbitrary_query():
+    """Any query string is rejected, not just plugin=."""
+    import base64
+    payload = base64.b64encode(b"aes-256-gcm:pw").decode().rstrip("=")
+    with pytest.raises(ProxyNodeError):
+        parse_ss_uri(f"ss://{payload}@example.com:8388?foo=bar")
+
+
 def test_parse_ss_uri_rejects_empty_userinfo():
     with pytest.raises(ProxyNodeError):
         parse_ss_uri("ss://@example.com:8388")

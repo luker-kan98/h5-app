@@ -300,7 +300,18 @@ def _normalize_proxy(fields: dict[str, Any]) -> dict[str, Any]:
         )
 
     raw_disable = fields.get("disableDirect", "false")
-    disable_direct = str(raw_disable).strip().lower() in ("true", "1", "yes")
+    if isinstance(raw_disable, bool):
+        disable_direct = raw_disable
+    else:
+        normalized = str(raw_disable).strip().lower()
+        if normalized in ("true", "1", "yes"):
+            disable_direct = True
+        elif normalized in ("false", "0", "no", ""):
+            disable_direct = False
+        else:
+            raise SdkValidationError(
+                f"disableDirect must be a boolean, got {raw_disable!r}"
+            )
 
     return {
         "ossUrls": oss_urls,

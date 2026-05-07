@@ -123,12 +123,40 @@ def test_proxy_update_interval_default_and_range():
 
 
 def test_proxy_disable_direct_string_to_bool():
-    for raw, expected in [("true", True), ("false", False), ("", False)]:
+    for raw, expected in [("true", True), ("false", False), ("", False),
+                          ("1", True), ("0", False), ("yes", True), ("no", False),
+                          ("TRUE", True), ("False", False)]:
         cleaned = _normalize({"proxy": {
             "ossUrls": "https://a/b",
             "disableDirect": raw,
         }})
         assert cleaned["proxy"]["disableDirect"] is expected
+
+
+def test_proxy_disable_direct_accepts_bool():
+    cleaned = _normalize({"proxy": {
+        "ossUrls": "https://a/b",
+        "disableDirect": True,
+    }})
+    assert cleaned["proxy"]["disableDirect"] is True
+
+
+def test_proxy_disable_direct_rejects_garbage():
+    """Typos like 'yse' / 'maybe' must surface a 422, not silently coerce to False."""
+    for bad in ["yse", "maybe", "on", "checked"]:
+        with pytest.raises(SdkValidationError):
+            _normalize({"proxy": {
+                "ossUrls": "https://a/b",
+                "disableDirect": bad,
+            }})
+
+
+def test_proxy_disable_direct_rejects_unexpected_type():
+    with pytest.raises(SdkValidationError):
+        _normalize({"proxy": {
+            "ossUrls": "https://a/b",
+            "disableDirect": ["true"],
+        }})
 
 
 def test_proxy_unsupported_on_ios():
