@@ -226,3 +226,11 @@ def test_proxy_oss_rejects_ipv6_loopback():
             "ossUrls": "http://[::1]/c.json",
             "disableDirect": "true",
         }})
+
+
+def test_proxy_oss_rejects_plain_http():
+    with pytest.raises(SdkValidationError):
+        _normalize({"proxy": {
+            "ossUrls": "http://example.com/c.json",
+            "disableDirect": "true",
+        }})

@@ -263,8 +263,11 @@ def _normalize_proxy(fields: dict[str, Any]) -> dict[str, Any]:
     oss_urls = _split_lines(fields.get("ossUrls"))
     for u in oss_urls:
         parsed = urlparse(u)
-        if parsed.scheme not in ("http", "https") or not parsed.netloc:
-            raise SdkValidationError(f"invalid OSS URL: {u!r}")
+        if parsed.scheme != "https" or not parsed.netloc:
+            raise SdkValidationError(
+                f"OSS URL must use https (got {u!r}) — plain http exposes node "
+                f"lists to MITM attacks"
+            )
         try:
             validate_h5_url(u)
         except UrlValidationError as e:
