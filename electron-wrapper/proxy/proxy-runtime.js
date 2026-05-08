@@ -32,6 +32,7 @@ class ProxyRuntime {
     this._savedPlatform = platform;
 
     const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'h5-proxy-'));
+    this._cacheDir = cacheDir;
     const binaryName = platform === 'win32' ? 'sing-box.exe' : 'sing-box';
     const binaryPath = path.join(resourcesPath, 'singbox', binaryName);
 
@@ -100,6 +101,10 @@ class ProxyRuntime {
     if (this._timer) { clearInterval(this._timer); this._timer = null; }
     if (this.supervisor) {
       try { await this.supervisor.stop(); } catch (_) {}
+    }
+    if (this._cacheDir) {
+      try { fs.rmSync(this._cacheDir, { recursive: true, force: true }); } catch (_) {}
+      this._cacheDir = null;
     }
     this._started = false;
   }
