@@ -79,6 +79,14 @@ class SingboxSupervisor {
 
     final cfgPath = '$configDir/singbox-config.json';
     await File(cfgPath).writeAsString(_renderConfig(_currentNode!));
+    // Restrict permissions: the config contains the proxy password.
+    // chmod is a no-op on Windows; the runProcess returns silently if it fails,
+    // which is acceptable since the leaked-permission consequence is the same.
+    if (!Platform.isWindows) {
+      try {
+        await Process.run('chmod', ['600', cfgPath]);
+      } catch (_) { /* best-effort */ }
+    }
     _recentStarts.add(DateTime.now());
 
     final handle = await _factory(binaryPath, ['run', '-c', cfgPath]);

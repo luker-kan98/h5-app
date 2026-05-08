@@ -81,9 +81,12 @@ void main() {
     final givenUp = expectLater(supervisor.gaveUp, completes);
     await supervisor.startWith(node);
     // Trigger 4 crashes; the 4th should resolve gaveUp.
+    // Each restart now forks `chmod` (Process.run) on POSIX to lock down the
+    // config; that wall-clock cost can exceed 10ms on slow hosts, so give the
+    // restart loop a bit more breathing room before crashing the next process.
     for (var i = 0; i < 4; i++) {
       processes[i].exitWith(1);
-      await Future<void>.delayed(const Duration(milliseconds: 10));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
     }
     await givenUp;
     expect(spawned, 4); // 1 initial + 3 restarts
@@ -117,6 +120,34 @@ void main() {
     await supervisor.startWith(b);
     // The first process should have been killed before the second was spawned.
     expect(killCount, greaterThanOrEqualTo(1));
+    await supervisor.stop();
+  });
+
+  test('writes config with 0600 permissions (POSIX only)', () async {
+    if (Platform.isWindows) return;  // chmod is a no-op on Windows
+    final tmp = await Directory.systemTemp.createTemp('singbox_sup');
+    addTearDown(() => tmp.delete(recursive: true));
+
+    String? receivedConfigPath;
+    final fakeProcess = _FakeProcess(1234);
+    final supervisor = SingboxSupervisor(
+      binaryPath: '/fake/sing-box',
+      configDir: tmp.path,
+      processFactory: (binary, args) {
+        receivedConfigPath = args[args.indexOf('-c') + 1];
+        return Future.value(fakeProcess);
+      },
+    );
+
+    const node = ProxyNode(
+      name: 'n', type: 'ss', server: 'h', port: 1,
+      cipher: 'aes-256-gcm', password: 'pw',
+    );
+    await supervisor.startWith(node);
+    final stat = await File(receivedConfigPath!).stat();
+    // mode is encoded as decimal where the low 9 bits are rwxrwxrwx.
+    // 0o600 == 384 decimal; we mask the file mode against 0o777 (511 decimal).
+    expect(stat.mode & 511, 384);
     await supervisor.stop();
   });
 }
