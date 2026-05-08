@@ -91,10 +91,30 @@ class ProxyRuntime {
     );
     _isHealthy = true;
 
+    // If sing-box later crashes past its restart budget, stop trusting the
+    // proxy. Callers that gate UI on `isHealthy` (notably main.dart's error
+    // page) will then re-evaluate on the next frame.
+    attachGaveUp(_supervisor.gaveUp, (healthy) => _isHealthy = healthy);
+
     _refreshTimer = Timer.periodic(
       Duration(milliseconds: (intervalH * 3600 * 1000).round()),
       (_) => _refresh(),
     );
+  }
+
+  /// Test seam + production wiring for the supervisor's gaveUp signal.
+  /// On gaveUp, marks the runtime unhealthy and tears down the timer so
+  /// the next refresh tick won't fire on a dead supervisor.
+  void attachGaveUp(Future<void> gaveUp, void Function(bool) onHealthChange) {
+    gaveUp.then((_) {
+      onHealthChange(false);
+      _refreshTimer?.cancel();
+      _refreshTimer = null;
+    }).catchError((Object _) {
+      onHealthChange(false);
+      _refreshTimer?.cancel();
+      _refreshTimer = null;
+    });
   }
 
   Future<void> _refresh() async {
