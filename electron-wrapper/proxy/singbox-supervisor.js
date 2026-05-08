@@ -75,12 +75,20 @@ class SingboxSupervisor {
     const now = Date.now();
     this._recentStarts = this._recentStarts.filter(t => now - t < 60_000);
     if (this._recentStarts.length >= MAX_RESTARTS_PER_MINUTE + 1) {
-      this._gaveUpResolve();
+      if (this._gaveUpResolve) {
+        this._gaveUpResolve();
+        this._gaveUpResolve = null;
+        this._gaveUpReject = null;
+      }
       return;
     }
     // Fire-and-forget restart; surface spawn errors through gaveUp.
     this._spawnOne().catch(err => {
-      this._gaveUpReject(err);
+      if (this._gaveUpReject) {
+        this._gaveUpReject(err);
+        this._gaveUpResolve = null;
+        this._gaveUpReject = null;
+      }
     });
   }
 
@@ -110,6 +118,15 @@ class SingboxSupervisor {
       try { this._proc.removeAllListeners('exit'); } catch (_) { /* swallow */ }
       try { this._proc.kill(); } catch (_) { /* swallow */ }
       this._proc = null;
+    }
+    // Resolve gaveUp so any .then() handlers attached via attachGaveUp run
+    // once and release their closures. Otherwise the Promise stays pending
+    // forever and across retry() cycles each ProxyRuntime accumulates one
+    // dangling handler per discarded supervisor (slow leak).
+    if (this._gaveUpResolve) {
+      this._gaveUpResolve();
+      this._gaveUpResolve = null;
+      this._gaveUpReject = null;
     }
   }
 }

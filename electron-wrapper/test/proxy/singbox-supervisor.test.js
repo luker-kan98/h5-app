@@ -116,6 +116,25 @@ describe('SingboxSupervisor', () => {
     await sup.stop();
   });
 
+  it('stop() resolves gaveUp so attached handlers run and release closures', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sup-'));
+    const spawn = sinon.fake.returns(fakeSpawn());
+    const sup = new SingboxSupervisor({
+      binaryPath: '/fake', configDir: dir, spawnFn: spawn,
+    });
+    await sup.startWith({
+      name: 'n', type: 'ss', server: 'h', port: 1,
+      cipher: 'aes-256-gcm', password: 'pw', udp: false,
+    });
+    let resolved = false;
+    sup.gaveUp.then(() => { resolved = true; });
+    await sup.stop();
+    // Drain microtasks so the .then handler runs.
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(resolved).toBe(true);
+  });
+
   it('writes config with mode 0o600 (POSIX only)', async () => {
     if (process.platform === 'win32') return;
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sup-'));
