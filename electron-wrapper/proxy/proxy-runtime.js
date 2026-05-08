@@ -17,6 +17,7 @@ class ProxyRuntime {
     this._started = false;
     this.isHealthy = false;
     this._timer = null;
+    this._cacheDir = null;
     this._savedConfig = null;
     this._savedH5Url = null;
     this._savedResourcesPath = null;
@@ -86,12 +87,7 @@ class ProxyRuntime {
     const url = this._savedH5Url;
     const rp = this._savedResourcesPath;
     const plat = this._savedPlatform;
-    if (this._timer) { clearInterval(this._timer); this._timer = null; }
-    if (this.supervisor) {
-      try { await this.supervisor.stop(); } catch (_) {}
-    }
-    this._started = false;
-    this.isHealthy = false;
+    await this.stop();
     if (cfg && url && rp && plat) {
       await this.start({ config: cfg, h5Url: url, resourcesPath: rp, platform: plat });
     }

@@ -37,4 +37,17 @@ describe('ProxyRuntime tempdir cleanup', () => {
     await rt.stop();  // must not throw
     expect(rt._started).toBe(false);
   });
+
+  it('retry() removes the previous cacheDir before starting fresh', async () => {
+    const rt = new ProxyRuntime();
+    const oldDir = fs.mkdtempSync(path.join(os.tmpdir(), 'h5-proxy-test-'));
+    rt._cacheDir = oldDir;
+    rt._started = true;
+    rt._savedConfig = null;  // start() returns early on missing args, so retry() also won't re-enter
+    rt._savedH5Url = null;
+    rt._savedResourcesPath = null;
+    rt._savedPlatform = null;
+    await rt.retry();
+    expect(fs.existsSync(oldDir)).toBe(false);
+  });
 });
