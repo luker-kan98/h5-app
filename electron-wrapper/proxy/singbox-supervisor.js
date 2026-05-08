@@ -52,7 +52,13 @@ class SingboxSupervisor {
       this._proc = null;
     }
     const cfgPath = path.join(this.configDir, 'singbox-config.json');
-    fs.writeFileSync(cfgPath, this._renderConfig(this._currentNode));
+    // The config contains the proxy password. Restrict to owner-only.
+    fs.writeFileSync(cfgPath, this._renderConfig(this._currentNode), { mode: 0o600 });
+    // writeFileSync only sets mode on file creation — if the file already
+    // exists (e.g. retry path), apply chmod explicitly. No-op on Windows.
+    if (process.platform !== 'win32') {
+      try { fs.chmodSync(cfgPath, 0o600); } catch (_) { /* best-effort */ }
+    }
     this._recentStarts.push(Date.now());
 
     const proc = this._spawn(this.binaryPath, ['run', '-c', cfgPath]);

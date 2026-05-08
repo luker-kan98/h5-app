@@ -115,4 +115,21 @@ describe('SingboxSupervisor', () => {
     expect(spawn.callCount).toBe(4);
     await sup.stop();
   });
+
+  it('writes config with mode 0o600 (POSIX only)', async () => {
+    if (process.platform === 'win32') return;
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sup-'));
+    const spawn = sinon.fake.returns(fakeSpawn());
+    const sup = new SingboxSupervisor({
+      binaryPath: '/fake', configDir: dir, spawnFn: spawn,
+    });
+    await sup.startWith({
+      name: 'n', type: 'ss', server: 'h', port: 1,
+      cipher: 'aes-256-gcm', password: 'pw', udp: false,
+    });
+    const cfgPath = path.join(dir, 'singbox-config.json');
+    const stat = fs.statSync(cfgPath);
+    expect(stat.mode & 0o777).toBe(0o600);
+    await sup.stop();
+  });
 });
