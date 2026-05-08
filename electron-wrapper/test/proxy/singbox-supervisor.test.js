@@ -78,4 +78,41 @@ describe('SingboxSupervisor', () => {
     expect(procs[0].kill.callCount).toBeGreaterThanOrEqual(1);
     await sup.stop();
   });
+
+  it('does not burn restart budget when killing previous process during probe walking', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sup-'));
+    const procs = [];
+    const spawn = sinon.fake(() => { const p = fakeSpawn(); procs.push(p); return p; });
+    const sup = new SingboxSupervisor({
+      binaryPath: '/fake', configDir: dir, spawnFn: spawn,
+    });
+    const node = (n) => ({
+      name: `n${n}`, type: 'ss', server: 'h', port: n,
+      cipher: 'aes-256-gcm', password: 'pw', udp: false,
+    });
+    // Simulate ProbeSelector walking 3 candidates. Each startWith kills the
+    // previous proc; if exit listeners weren't removed, the kill-emit would
+    // push extra entries onto _recentStarts and exhaust the budget here.
+    // With MAX_RESTARTS_PER_MINUTE=3, the budget allows 1 initial + 3 restarts
+    // = 4 total spawns. Walking 3 candidates uses 3 budget slots, leaving room
+    // for one crash-restart.
+    await sup.startWith(node(1));
+    await sup.startWith(node(2));
+    await sup.startWith(node(3));
+    // Track gaveUp resolution so we can assert it has NOT resolved early.
+    let gaveUpResolved = false;
+    sup.gaveUp.then(() => { gaveUpResolved = true; });
+    await new Promise(r => setImmediate(r));
+    // Without the fix, the 2 kills (proc1, proc2) would have each fired
+    // exit listeners and either re-spawned or resolved gaveUp early.
+    expect(gaveUpResolved).toBe(false);
+    // Now emit exit on the *currently active* (3rd) process to fail naturally.
+    procs[2].emit('exit', 1);
+    await new Promise(r => setImmediate(r));
+    // Expected: 3 startWith calls = 3 spawns, plus 1 crash-restart from
+    // exiting procs[2] = 4 spawns total. (procs[0] and procs[1] were killed
+    // but their exit listeners were detached, so no spurious restarts.)
+    expect(spawn.callCount).toBe(4);
+    await sup.stop();
+  });
 });

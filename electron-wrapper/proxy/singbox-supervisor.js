@@ -42,7 +42,12 @@ class SingboxSupervisor {
     // Terminate any prior process before launching the new one — otherwise
     // probe-selector walking N candidates leaves up to N-1 orphan sing-box
     // processes around.
-    if (this._proc && this._proc.kill) {
+    if (this._proc) {
+      // Detach the exit listener BEFORE killing, otherwise the SIGTERM
+      // emit('exit') would fire _onExit and burn a restart-budget slot
+      // for a process we deliberately terminated. Without this, ProbeSelector
+      // walking 4+ candidates would prematurely resolve gaveUp.
+      try { this._proc.removeAllListeners('exit'); } catch (_) { /* swallow */ }
       try { this._proc.kill(); } catch (_) { /* swallow */ }
       this._proc = null;
     }
@@ -93,9 +98,11 @@ class SingboxSupervisor {
 
   async stop() {
     this._stopped = true;
-    try {
-      if (this._proc && this._proc.kill) this._proc.kill();
-    } catch (_) { /* swallow */ }
+    if (this._proc) {
+      try { this._proc.removeAllListeners('exit'); } catch (_) { /* swallow */ }
+      try { this._proc.kill(); } catch (_) { /* swallow */ }
+      this._proc = null;
+    }
   }
 }
 
