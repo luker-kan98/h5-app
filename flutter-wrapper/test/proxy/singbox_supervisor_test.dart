@@ -14,6 +14,13 @@ class _FakeProcess {
   void exitWith(int code) => _exit.complete(code);
 }
 
+class _FakeProcessWithKillCounter extends _FakeProcess {
+  final void Function() onKill;
+  _FakeProcessWithKillCounter(int pid, this.onKill) : super(pid);
+  @override
+  void kill() => onKill();
+}
+
 void main() {
   test('writes config file before spawning', () async {
     final tmp = await Directory.systemTemp.createTemp('singbox_sup');
@@ -80,5 +87,36 @@ void main() {
     }
     await givenUp;
     expect(spawned, 4); // 1 initial + 3 restarts
+  });
+
+  test('kills previous process when startWith is called again', () async {
+    final tmp = await Directory.systemTemp.createTemp('singbox_sup');
+    addTearDown(() => tmp.delete(recursive: true));
+
+    final processes = <_FakeProcess>[];
+    int killCount = 0;
+    final supervisor = SingboxSupervisor(
+      binaryPath: '/fake/sing-box',
+      configDir: tmp.path,
+      processFactory: (binary, args) {
+        final p = _FakeProcessWithKillCounter(processes.length + 1, () => killCount++);
+        processes.add(p);
+        return Future.value(p);
+      },
+    );
+
+    const a = ProxyNode(
+      name: 'a', type: 'ss', server: 'h', port: 1,
+      cipher: 'aes-256-gcm', password: 'pw',
+    );
+    const b = ProxyNode(
+      name: 'b', type: 'ss', server: 'h', port: 2,
+      cipher: 'aes-256-gcm', password: 'pw',
+    );
+    await supervisor.startWith(a);
+    await supervisor.startWith(b);
+    // The first process should have been killed before the second was spawned.
+    expect(killCount, greaterThanOrEqualTo(1));
+    await supervisor.stop();
   });
 }

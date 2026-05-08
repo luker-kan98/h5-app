@@ -65,6 +65,15 @@ class SingboxSupervisor {
 
   Future<void> _spawn() async {
     if (_stopped) return;
+    // If a previous process is still running (e.g. from probe-selector
+    // walking through candidate nodes), terminate it before spawning the
+    // next one. Otherwise we accumulate orphan sing-box processes.
+    await _exitSub?.cancel();
+    _exitSub = null;
+    try {
+      (_process as dynamic)?.kill();
+    } catch (_) {}
+
     final cfgPath = '$configDir/singbox-config.json';
     await File(cfgPath).writeAsString(_renderConfig(_currentNode!));
     _recentStarts.add(DateTime.now());
@@ -72,7 +81,6 @@ class SingboxSupervisor {
     final handle = await _factory(binaryPath, ['run', '-c', cfgPath]);
     _process = handle;
 
-    _exitSub?.cancel();
     final exitFuture = handle.exitCode as Future<int>;
     _exitSub = exitFuture.asStream().listen((_) {
       if (_stopped) return;
