@@ -57,11 +57,26 @@ class ProxyRuntime {
       return;
     }
     this.isHealthy = true;
+    this.attachGaveUp(this.supervisor);
 
     const intervalMs = (Number(config.updateIntervalHours) || 1) * 3600 * 1000;
     this._timer = setInterval(() => {
       this.pool.refresh().catch(() => { /* swallow */ });
     }, intervalMs);
+  }
+
+  /**
+   * Test seam + production wiring. When the supervisor's gaveUp promise
+   * resolves (sing-box exhausted its restart budget), flip isHealthy=false
+   * and cancel the refresh timer so we stop spinning on a dead proxy.
+   */
+  attachGaveUp(supervisor) {
+    if (!supervisor || !supervisor.gaveUp) return;
+    const onGiveUp = () => {
+      this.isHealthy = false;
+      if (this._timer) { clearInterval(this._timer); this._timer = null; }
+    };
+    supervisor.gaveUp.then(onGiveUp, onGiveUp);
   }
 
   /// Tears down + retries from saved config. Used by the error page button.
