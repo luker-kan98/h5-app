@@ -49,6 +49,8 @@ class ProbeSelector {
   /// Public for compile-time fencing: a probe that accepts the proxy
   /// address as an explicit parameter rather than a hardcoded constant.
   static Future<bool> httpHeadProbeWithAddress(
+    // unused here; present so the signature matches ProbeFn (typedef requires
+    // node so user-injected probes can make per-node decisions).
     ProxyNode node,
     String h5Url,
     String httpAddress,

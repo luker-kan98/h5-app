@@ -4,6 +4,7 @@ import 'package:h5_app/proxy/proxy_node.dart';
 
 class _RecordingSupervisor {
   final List<String> startedNodes = [];
+  String get httpAddress => '127.0.0.1:1081';
   Future<void> startWith(ProxyNode node) async {
     startedNodes.add(node.name);
   }
