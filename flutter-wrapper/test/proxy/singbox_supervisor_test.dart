@@ -16,7 +16,7 @@ class _FakeProcess {
 
 class _FakeProcessWithKillCounter extends _FakeProcess {
   final void Function() onKill;
-  _FakeProcessWithKillCounter(int pid, this.onKill) : super(pid);
+  _FakeProcessWithKillCounter(super.pid, this.onKill);
   @override
   void kill() => onKill();
 }
