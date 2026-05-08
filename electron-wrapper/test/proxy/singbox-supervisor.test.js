@@ -63,4 +63,19 @@ describe('SingboxSupervisor', () => {
     expect(sup.socksAddress).toBe('127.0.0.1:1080');
     expect(sup.httpAddress).toBe('127.0.0.1:1081');
   });
+
+  it('kills previous process before spawning the next', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sup-'));
+    const procs = [];
+    const spawn = sinon.fake(() => { const p = fakeSpawn(); procs.push(p); return p; });
+    const sup = new SingboxSupervisor({
+      binaryPath: '/fake', configDir: dir, spawnFn: spawn,
+    });
+    const a = { name: 'a', type: 'ss', server: 'h', port: 1, cipher: 'aes-256-gcm', password: 'pw', udp: false };
+    const b = { name: 'b', type: 'ss', server: 'h', port: 2, cipher: 'aes-256-gcm', password: 'pw', udp: false };
+    await sup.startWith(a);
+    await sup.startWith(b);
+    expect(procs[0].kill.callCount).toBeGreaterThanOrEqual(1);
+    await sup.stop();
+  });
 });

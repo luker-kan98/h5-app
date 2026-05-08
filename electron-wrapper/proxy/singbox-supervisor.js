@@ -39,6 +39,13 @@ class SingboxSupervisor {
 
   async _spawnOne() {
     if (this._stopped) return;
+    // Terminate any prior process before launching the new one — otherwise
+    // probe-selector walking N candidates leaves up to N-1 orphan sing-box
+    // processes around.
+    if (this._proc && this._proc.kill) {
+      try { this._proc.kill(); } catch (_) { /* swallow */ }
+      this._proc = null;
+    }
     const cfgPath = path.join(this.configDir, 'singbox-config.json');
     fs.writeFileSync(cfgPath, this._renderConfig(this._currentNode));
     this._recentStarts.push(Date.now());
