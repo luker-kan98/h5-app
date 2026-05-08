@@ -54,8 +54,10 @@ class SingboxSupervisor {
     const cfgPath = path.join(this.configDir, 'singbox-config.json');
     // The config contains the proxy password. Restrict to owner-only.
     fs.writeFileSync(cfgPath, this._renderConfig(this._currentNode), { mode: 0o600 });
-    // writeFileSync only sets mode on file creation — if the file already
-    // exists (e.g. retry path), apply chmod explicitly. No-op on Windows.
+    // writeFileSync `mode` is only applied on file creation; on an existing
+    // file the truncate-and-rewrite leaves the old permissions intact. The
+    // unconditional chmodSync below covers both cases (and is also umask-
+    // independent). No-op on Windows where NTFS doesn't honor POSIX mode.
     if (process.platform !== 'win32') {
       try { fs.chmodSync(cfgPath, 0o600); } catch (_) { /* best-effort */ }
     }

@@ -84,7 +84,15 @@ class SingboxSupervisor {
     // which is acceptable since the leaked-permission consequence is the same.
     if (!Platform.isWindows) {
       try {
-        await Process.run('chmod', ['600', cfgPath]);
+        final result = await Process.run('chmod', ['600', cfgPath]);
+        // Surface non-zero exit in debug/test builds so a silent chmod
+        // failure (e.g. chmod absent from PATH on some Android variants)
+        // doesn't leave the password-bearing config world-readable
+        // without any signal.
+        assert(
+          result.exitCode == 0,
+          'chmod 600 failed (exit ${result.exitCode}): ${result.stderr}',
+        );
       } catch (_) { /* best-effort */ }
     }
     _recentStarts.add(DateTime.now());
