@@ -234,3 +234,37 @@ def test_proxy_oss_rejects_plain_http():
             "ossUrls": "http://example.com/c.json",
             "disableDirect": "true",
         }})
+
+
+def test_proxy_oss_rejects_https_loopback_ip():
+    """SSRF guard must still reject https://127.0.0.1/... (post Task 9 https-only)."""
+    with pytest.raises(SdkValidationError):
+        _normalize({"proxy": {
+            "ossUrls": "https://127.0.0.1/c.json",
+            "disableDirect": "true",
+        }})
+
+
+def test_proxy_oss_rejects_https_rfc1918():
+    for ip in ("10.0.0.1", "172.16.0.1", "192.168.1.1"):
+        with pytest.raises(SdkValidationError):
+            _normalize({"proxy": {
+                "ossUrls": f"https://{ip}/c.json",
+                "disableDirect": "true",
+            }})
+
+
+def test_proxy_oss_rejects_https_link_local():
+    with pytest.raises(SdkValidationError):
+        _normalize({"proxy": {
+            "ossUrls": "https://169.254.169.254/latest/meta-data/",
+            "disableDirect": "true",
+        }})
+
+
+def test_proxy_oss_rejects_https_ipv6_loopback():
+    with pytest.raises(SdkValidationError):
+        _normalize({"proxy": {
+            "ossUrls": "https://[::1]/c.json",
+            "disableDirect": "true",
+        }})
