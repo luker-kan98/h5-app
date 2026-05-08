@@ -11,6 +11,7 @@ from app.services.proxy_node_parser import (
     ProxyNodeError,
     parse_node_line,
 )
+from app.services.url_validator import UrlValidationError, validate_h5_url
 
 
 VALID_PLATFORMS = {"android", "ios", "macos", "windows"}
@@ -264,6 +265,10 @@ def _normalize_proxy(fields: dict[str, Any]) -> dict[str, Any]:
         parsed = urlparse(u)
         if parsed.scheme not in ("http", "https") or not parsed.netloc:
             raise SdkValidationError(f"invalid OSS URL: {u!r}")
+        try:
+            validate_h5_url(u)
+        except UrlValidationError as e:
+            raise SdkValidationError(f"OSS URL {u!r} rejected: {e}") from e
 
     dns_txt = _split_lines(fields.get("dnsTxtDomains"))
     for d in dns_txt:

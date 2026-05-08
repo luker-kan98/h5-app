@@ -185,3 +185,44 @@ def test_proxy_oss_urls_accepts_json_array():
         "https://a.example.com/c.json",
         "https://b.example.com/c.json",
     ]
+
+
+def test_proxy_oss_rejects_localhost():
+    with pytest.raises(SdkValidationError):
+        _normalize({"proxy": {
+            "ossUrls": "http://localhost/c.json",
+            "disableDirect": "true",
+        }})
+
+
+def test_proxy_oss_rejects_loopback_ip():
+    with pytest.raises(SdkValidationError):
+        _normalize({"proxy": {
+            "ossUrls": "http://127.0.0.1/c.json",
+            "disableDirect": "true",
+        }})
+
+
+def test_proxy_oss_rejects_rfc1918():
+    for ip in ("10.0.0.1", "172.16.0.1", "192.168.1.1"):
+        with pytest.raises(SdkValidationError):
+            _normalize({"proxy": {
+                "ossUrls": f"http://{ip}/c.json",
+                "disableDirect": "true",
+            }})
+
+
+def test_proxy_oss_rejects_link_local():
+    with pytest.raises(SdkValidationError):
+        _normalize({"proxy": {
+            "ossUrls": "http://169.254.169.254/latest/meta-data/",
+            "disableDirect": "true",
+        }})
+
+
+def test_proxy_oss_rejects_ipv6_loopback():
+    with pytest.raises(SdkValidationError):
+        _normalize({"proxy": {
+            "ossUrls": "http://[::1]/c.json",
+            "disableDirect": "true",
+        }})
