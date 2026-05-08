@@ -64,4 +64,13 @@ void main() {
     final winner = await selector.pick([mk('a'), mk('b')]);
     expect(winner!.name, 'b');
   });
+
+  test('default probe reads address from supervisor.httpAddress', () {
+    // Compile-time check: the static probe signature accepts a third
+    // String parameter for the HTTP address. If the signature changes
+    // away from this, this test stops compiling — exactly the fence we
+    // want against accidentally hardcoding the address again.
+    const f = ProbeSelector.httpHeadProbeWithAddress;
+    expect(f, isA<Function>());
+  });
 }

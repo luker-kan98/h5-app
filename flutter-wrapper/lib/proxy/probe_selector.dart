@@ -14,13 +14,15 @@ class ProbeSelector {
   // matches the supervisor's own dynamic process handle convention and lets
   // tests pass a fake without inheriting from a base class.
   final dynamic supervisor;
-  final ProbeFn _probe;
+  final ProbeFn? _userProbe;
 
   ProbeSelector({
     required this.h5Url,
     required this.supervisor,
     ProbeFn? probe,
-  }) : _probe = probe ?? _httpHeadProbe;
+  }) : _userProbe = probe;
+
+  ProbeFn get _probe => _userProbe ?? _defaultProbe;
 
   Future<ProxyNode?> pick(List<ProxyNode> nodes) async {
     for (final node in nodes) {
@@ -37,9 +39,22 @@ class ProbeSelector {
     return null;
   }
 
-  static Future<bool> _httpHeadProbe(ProxyNode node, String h5Url) async {
+  /// Default probe path: read the local HTTP inbound address from the
+  /// supervisor and HEAD the H5 URL through it.
+  Future<bool> _defaultProbe(ProxyNode node, String h5Url) {
+    final addr = (supervisor.httpAddress as String);
+    return httpHeadProbeWithAddress(node, h5Url, addr);
+  }
+
+  /// Public for compile-time fencing: a probe that accepts the proxy
+  /// address as an explicit parameter rather than a hardcoded constant.
+  static Future<bool> httpHeadProbeWithAddress(
+    ProxyNode node,
+    String h5Url,
+    String httpAddress,
+  ) async {
     final client = HttpClient();
-    client.findProxy = (uri) => 'PROXY 127.0.0.1:1081';
+    client.findProxy = (uri) => 'PROXY $httpAddress';
     try {
       final req = await client
           .headUrl(Uri.parse(h5Url))
