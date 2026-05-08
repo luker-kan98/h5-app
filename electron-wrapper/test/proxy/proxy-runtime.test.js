@@ -10,7 +10,8 @@ describe('ProxyRuntime gaveUp wiring', () => {
     rt._timer = setInterval(() => {}, 1_000_000);
     rt.attachGaveUp({ gaveUp });
     resolveGaveUp();
-    await new Promise(r => setImmediate(r));
+    await Promise.resolve();
+    await Promise.resolve();
     expect(rt.isHealthy).toBe(false);
     expect(rt._timer).toBeNull();
   });
