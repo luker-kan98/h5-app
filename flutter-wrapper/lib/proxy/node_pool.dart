@@ -127,6 +127,7 @@ class NodePool {
       if (colonIdx < 0) return null;
       final host = hostport.substring(0, colonIdx);
       final port = int.tryParse(hostport.substring(colonIdx + 1)) ?? 0;
+      if (port < 1 || port > 65535) return null;
       final paddedB64 = userinfo + '=' * ((4 - userinfo.length % 4) % 4);
       final decoded = utf8.decode(base64Url.decode(
         paddedB64.replaceAll('+', '-').replaceAll('/', '_'),

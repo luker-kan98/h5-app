@@ -49,9 +49,18 @@ class ProxyRuntime {
       configDir: cacheDir.path,
     );
 
+    // builtinProxies are pre-validated server-side, but defend against runtime
+    // schema drift by filtering — same pattern as NodePool's OSS feed path.
     final builtin = ((config['builtinProxies'] as List?) ?? const [])
         .whereType<Map<String, dynamic>>()
-        .map(ProxyNode.fromJson)
+        .map<ProxyNode?>((m) {
+          try {
+            return ProxyNode.fromJson(m);
+          } catch (_) {
+            return null;
+          }
+        })
+        .whereType<ProxyNode>()
         .toList();
     final ossUrls = ((config['ossUrls'] as List?) ?? const [])
         .map((e) => e as String)
