@@ -15,7 +15,6 @@ from celery.exceptions import SoftTimeLimitExceeded
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
-from app.models.build_job import BuildJob
 from app.models.build_request import BuildRequest
 from app.models.build_sdk_config import BuildSdkConfig
 from app.models.build_task import BuildTask
@@ -45,11 +44,6 @@ if _session_factory_options.get("bind") is not None:
 
 def _get_db() -> Session:
     return SessionLocal()
-
-
-def _update_job(db: Session, job_id: int, **kwargs):
-    db.query(BuildJob).filter(BuildJob.id == job_id).update(kwargs, synchronize_session="fetch")
-    db.commit()
 
 
 def _run(cmd: list, cwd: str, env: dict = None) -> None:
