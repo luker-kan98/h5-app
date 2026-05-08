@@ -68,7 +68,10 @@ class SingboxSupervisor {
     // If a previous process is still running (e.g. from probe-selector
     // walking through candidate nodes), terminate it before spawning the
     // next one. Otherwise we accumulate orphan sing-box processes.
-    await _exitSub?.cancel();
+    // Cancellation is fire-and-forget: under the test fakes the source
+    // Future never completes, so awaiting cancel() can hang. The _stopped
+    // flag plus nulling the ref are what actually prevent stale callbacks.
+    _exitSub?.cancel();
     _exitSub = null;
     try {
       (_process as dynamic)?.kill();
@@ -138,7 +141,8 @@ class SingboxSupervisor {
 
   Future<void> stop() async {
     _stopped = true;
-    await _exitSub?.cancel();
+    _exitSub?.cancel();
+    _exitSub = null;
     try {
       (_process as dynamic)?.kill();
     } catch (_) {}
