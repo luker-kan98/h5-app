@@ -264,15 +264,9 @@ def test_prepare_electron_updates_metadata_and_icons(tmp_path):
 def test_execute_build_task_uploads_artifact_to_s3_and_persists_url(db, tmp_path):
     from app.models.build_request import BuildRequest
     from app.models.build_task import BuildTask
-    from app.models.user import User
-
-    user = User(username="s3-worker", password="x")
-    db.add(user)
-    db.commit()
 
     request = BuildRequest(
         request_id="request-s3-1",
-        user_id=user.id,
         h5_url="https://example.com",
         app_name="Example App",
         requested_platforms=json.dumps(["android"]),

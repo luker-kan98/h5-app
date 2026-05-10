@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -11,7 +11,6 @@ class BuildRequest(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     request_id: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     h5_url: Mapped[str] = mapped_column(String, nullable=False)
     app_name: Mapped[str] = mapped_column(String, nullable=False, default="H5 App")
     requested_platforms: Mapped[str] = mapped_column(Text, nullable=False)

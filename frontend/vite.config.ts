@@ -12,10 +12,11 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/auth': 'http://localhost:8000',
       '/build': 'http://localhost:8000',
       '/builds': 'http://localhost:8000',
+      '/rebuild': 'http://localhost:8000',
       '/files': 'http://localhost:8000',
+      '/sdk-catalog': 'http://localhost:8000',
     },
   },
 })

@@ -69,7 +69,7 @@ onMounted(async () => {
   try {
     items.value = await getHistory()
   } catch {
-    // token expired — router guard will redirect to /login on next navigation
+    items.value = []
   }
 })
 </script>

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'appvue_plugin.dart';
+import 'proxy/domain_resolver.dart';
 import 'proxy/error_page.dart';
 import 'proxy/proxy_runtime.dart';
 import 'sdk_bridge.dart';
@@ -95,7 +96,34 @@ class _WebViewPageState extends State<WebViewPage> {
     if (proxyEnabled && !proxyHealthy && disableDirect) {
       _controller.loadHtmlString(proxyErrorHtml);
     } else {
-      _controller.loadRequest(Uri.parse(_h5Url));
+      _loadResolvedUrl();
+    }
+  }
+
+  Future<void> _loadResolvedUrl() async {
+    final originalUri = Uri.parse(_h5Url);
+    final domainConfigUrls = _domainConfigUrlsFromConfig();
+    final target = domainConfigUrls.isEmpty
+        ? originalUri
+        : await DomainResolver.resolve(
+            originalUrl: originalUri,
+            domainConfigUrls: domainConfigUrls,
+          );
+    if (!mounted) return;
+    _controller.loadRequest(target);
+  }
+
+  List<String> _domainConfigUrlsFromConfig() {
+    final raw = sdk_config.proxyConfigJson;
+    if (raw.isEmpty) return const [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) return const [];
+      final urls = decoded['domainConfigUrls'];
+      if (urls is! List) return const [];
+      return urls.whereType<String>().where((s) => s.isNotEmpty).toList();
+    } catch (_) {
+      return const [];
     }
   }
 

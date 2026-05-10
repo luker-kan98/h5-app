@@ -21,17 +21,20 @@ class ProbeSelector {
   }
 
   async pick(nodes) {
+    console.log('[probe] pick start: %d candidate node(s) for %s', nodes.length, this.h5Url);
     for (const node of nodes) {
+      console.log('[probe] trying node name=%s server=%s:%d', node.name, node.server, node.port);
       await this.supervisor.startWith(node);
-      // Brief delay so sing-box has time to bind sockets in production.
-      // Tests inject a synthetic probe so this is paid only in real runs.
       await new Promise(r => setTimeout(r, 200));
       try {
-        if (await this._probe(node, this.h5Url)) return node;
-      } catch (_) {
-        // probe failure is non-fatal; try the next node
+        const ok = await this._probe(node, this.h5Url);
+        console.log('[probe] result for %s: %s', node.name, ok ? 'OK' : 'FAIL');
+        if (ok) return node;
+      } catch (e) {
+        console.warn('[probe] threw for %s:', node.name, e && e.message ? e.message : e);
       }
     }
+    console.error('[probe] no node passed probe — pool exhausted');
     return null;
   }
 }
@@ -49,11 +52,19 @@ function defaultProbe(_node, h5Url) {
       agent,
       timeout: 5000,
     }, (res) => {
+      console.log('[probe] HTTP %d via socks5 for %s', res.statusCode, url.hostname);
       resolve(res.statusCode >= 200 && res.statusCode < 400);
       res.resume();
     });
-    req.on('error', () => resolve(false));
-    req.on('timeout', () => { req.destroy(); resolve(false); });
+    req.on('error', (err) => {
+      console.warn('[probe] error via socks5 for %s: %s', url.hostname, err.message);
+      resolve(false);
+    });
+    req.on('timeout', () => {
+      console.warn('[probe] timeout via socks5 for %s', url.hostname);
+      req.destroy();
+      resolve(false);
+    });
     req.end();
   });
 }

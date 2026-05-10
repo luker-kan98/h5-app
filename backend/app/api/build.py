@@ -8,13 +8,12 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
-from app.dependencies import get_db, get_current_user
+from app.dependencies import get_db
 from app.i18n import t
 from app.models.build_job import BuildJob
 from app.models.build_request import BuildRequest
 from app.models.build_sdk_config import BuildSdkConfig
 from app.models.build_task import BuildTask
-from app.models.user import User
 from app.schemas import BuildSubmitResponse, BuildStatusResponse, HistoryItem
 from app.services.icon_service import IconValidationError, normalize_app_name, validate_icon_upload
 from app.services.file_service import PLATFORM_FILENAMES, build_job_to_status_response, build_request_to_status_response
@@ -54,7 +53,6 @@ async def submit_build(
     sdk_configs: Optional[str] = Form(None),
     language: Optional[str] = Query(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     try:
         app_name = normalize_app_name(app_name, language)
@@ -127,7 +125,6 @@ async def submit_build(
     request_uuid = str(uuid.uuid4())
     build_request = BuildRequest(
         request_id=request_uuid,
-        user_id=current_user.id,
         h5_url=h5_url,
         app_name=app_name,
         status="submitted",
@@ -205,11 +202,9 @@ def rebuild(
     request_id: str,
     language: Optional[str] = Query(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     original = db.query(BuildRequest).filter(
         BuildRequest.request_id == request_id,
-        BuildRequest.user_id == current_user.id,
     ).first()
     if not original:
         raise HTTPException(status_code=404, detail=t("build_request_not_found", language))
@@ -221,7 +216,6 @@ def rebuild(
     platforms = json.loads(original.requested_platforms)
     new_request = BuildRequest(
         request_id=str(uuid.uuid4()),
-        user_id=current_user.id,
         h5_url=original.h5_url,
         app_name=original.app_name,
         status="submitted",
@@ -290,11 +284,9 @@ def get_build_status(
     task_id: str,
     language: Optional[str] = Query(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     build_request = db.query(BuildRequest).filter(
         BuildRequest.request_id == task_id,
-        BuildRequest.user_id == current_user.id,
     ).first()
     if build_request:
         refresh_request_status(db, build_request.id)
@@ -313,7 +305,6 @@ def get_build_status(
 
     job = db.query(BuildJob).filter(
         BuildJob.task_id == task_id,
-        BuildJob.user_id == current_user.id,
     ).first()
     if not job:
         raise HTTPException(status_code=404, detail=t("build_job_not_found", language))
@@ -326,12 +317,9 @@ def download_file(
     filename: str,
     language: Optional[str] = Query(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
-    """Authenticated file download — verifies task belongs to requesting user."""
     build_request = db.query(BuildRequest).filter(
         BuildRequest.request_id == task_id,
-        BuildRequest.user_id == current_user.id,
     ).first()
     if build_request:
         platform = next((name for name, value in PLATFORM_FILENAMES.items() if value == filename), None)
@@ -349,7 +337,6 @@ def download_file(
     else:
         job = db.query(BuildJob).filter(
             BuildJob.task_id == task_id,
-            BuildJob.user_id == current_user.id,
         ).first()
         if not job:
             raise HTTPException(status_code=404, detail=t("build_job_not_found", language))
@@ -363,11 +350,9 @@ def download_file(
 @router.get("/builds/history", response_model=list[HistoryItem])
 def get_history(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     requests = (
         db.query(BuildRequest)
-        .filter(BuildRequest.user_id == current_user.id)
         .order_by(BuildRequest.created_at.desc())
         .limit(50)
         .all()
@@ -387,7 +372,6 @@ def get_history(
 
     jobs = (
         db.query(BuildJob)
-        .filter(BuildJob.user_id == current_user.id)
         .order_by(BuildJob.created_at.desc())
         .limit(50)
         .all()

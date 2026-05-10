@@ -14,8 +14,38 @@ def test_proxy_requires_at_least_one_node_source():
     with pytest.raises(SdkValidationError):
         _normalize({"proxy": {
             "ossUrls": "",
+            "domainConfigUrls": "",
             "dnsTxtDomains": "",
             "builtinProxies": "",
+            "disableDirect": "true",
+        }})
+
+
+def test_proxy_only_domain_config_urls_is_valid():
+    cleaned = _normalize({"proxy": {
+        "domainConfigUrls": "https://cfg.example.com/d.txt\nhttps://cfg2.example.com/d.txt",
+        "disableDirect": "true",
+    }})
+    p = cleaned["proxy"]
+    assert p["domainConfigUrls"] == [
+        "https://cfg.example.com/d.txt",
+        "https://cfg2.example.com/d.txt",
+    ]
+    assert p["ossUrls"] == []
+
+
+def test_proxy_domain_config_url_must_be_https():
+    with pytest.raises(SdkValidationError, match="must use https"):
+        _normalize({"proxy": {
+            "domainConfigUrls": "http://cfg.example.com/d.txt",
+            "disableDirect": "true",
+        }})
+
+
+def test_proxy_domain_config_url_blocks_internal_targets():
+    with pytest.raises(SdkValidationError):
+        _normalize({"proxy": {
+            "domainConfigUrls": "https://127.0.0.1/d.txt",
             "disableDirect": "true",
         }})
 

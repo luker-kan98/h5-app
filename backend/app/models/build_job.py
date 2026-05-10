@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Integer, String, DateTime, ForeignKey
+from sqlalchemy import Integer, String, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
@@ -9,7 +9,6 @@ class BuildJob(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     task_id: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
     h5_url: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(String, default="pending")  # pending/running/done/failed
     requested_platforms: Mapped[str] = mapped_column(String, nullable=False)  # JSON list

@@ -27,3 +27,7 @@ contextBridge.exposeInMainWorld('h5app', {
 contextBridge.exposeInMainWorld('electronProxyRetry', () => {
   ipcRenderer.invoke('proxy:retry');
 });
+
+contextBridge.exposeInMainWorld('electronOpenLogs', () => {
+  ipcRenderer.invoke('proxy:openLogs');
+});

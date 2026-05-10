@@ -3,10 +3,7 @@
     <div class="max-w-lg mx-auto">
       <div class="flex justify-between items-center mb-8">
         <h1 class="text-2xl font-bold">Package H5 App</h1>
-        <div class="space-x-2">
-          <router-link to="/history" class="text-sm text-blue-600 hover:underline">History</router-link>
-          <button @click="logout" class="text-sm text-gray-500 hover:underline">Logout</button>
-        </div>
+        <router-link to="/history" class="text-sm text-blue-600 hover:underline">History</router-link>
       </div>
       <div class="bg-white rounded-xl shadow p-6 space-y-5">
         <div>
@@ -56,11 +53,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuth } from '@/composables/useAuth'
 import { useBuild } from '@/composables/useBuild'
 import SdkConfigSection from '@/components/SdkConfigSection.vue'
 
-const { logout } = useAuth()
 const { submitBuild, loading, error } = useBuild()
 const router = useRouter()
 

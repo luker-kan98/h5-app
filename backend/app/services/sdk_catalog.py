@@ -138,12 +138,21 @@ CATALOG: dict[str, SdkDefinition] = {
         fields=(
             SdkField(
                 name="ossUrls",
-                label_en="OSS Config URLs",
-                label_zh="OSS 地址",
-                help_zh="(一行一个)",
+                label_en="OSS Proxy Node URLs",
+                label_zh="OSS 节点列表地址",
+                help_zh="(一行一个，文件内容为代理节点列表)",
                 required=False,
                 widget="textarea",
-                placeholder="https://example.com/config.json",
+                placeholder="https://example.com/nodes.json",
+            ),
+            SdkField(
+                name="domainConfigUrls",
+                label_en="Domain Failover Config URLs",
+                label_zh="备选域名配置地址",
+                help_zh="(一行一个，每个 URL 指向一份纯文本，按行返回 H5 备选域名)",
+                required=False,
+                widget="textarea",
+                placeholder="https://example.com/domains.txt",
             ),
             SdkField(
                 name="updateIntervalHours",
@@ -273,6 +282,19 @@ def _normalize_proxy(fields: dict[str, Any]) -> dict[str, Any]:
         except UrlValidationError as e:
             raise SdkValidationError(f"OSS URL {u!r} rejected: {e}") from e
 
+    domain_config_urls = _split_lines(fields.get("domainConfigUrls"))
+    for u in domain_config_urls:
+        parsed = urlparse(u)
+        if parsed.scheme != "https" or not parsed.netloc:
+            raise SdkValidationError(
+                f"Domain config URL must use https (got {u!r}) — plain http "
+                f"lets attackers redirect users to a malicious host"
+            )
+        try:
+            validate_h5_url(u)
+        except UrlValidationError as e:
+            raise SdkValidationError(f"Domain config URL {u!r} rejected: {e}") from e
+
     dns_txt = _split_lines(fields.get("dnsTxtDomains"))
     for d in dns_txt:
         if not _DOMAIN_RE.match(d):
@@ -287,9 +309,10 @@ def _normalize_proxy(fields: dict[str, Any]) -> dict[str, Any]:
             raise SdkValidationError(f"builtinProxies line {idx}: {e}") from e
         builtin_nodes.append(node.to_dict())
 
-    if not (oss_urls or dns_txt or builtin_nodes):
+    if not (oss_urls or dns_txt or builtin_nodes or domain_config_urls):
         raise SdkValidationError(
-            "proxy SDK requires at least one of ossUrls / dnsTxtDomains / builtinProxies"
+            "proxy SDK requires at least one of ossUrls / dnsTxtDomains / "
+            "builtinProxies / domainConfigUrls"
         )
 
     raw_interval = fields.get("updateIntervalHours")
@@ -323,6 +346,7 @@ def _normalize_proxy(fields: dict[str, Any]) -> dict[str, Any]:
 
     return {
         "ossUrls": oss_urls,
+        "domainConfigUrls": domain_config_urls,
         "updateIntervalHours": interval,
         "dnsTxtDomains": dns_txt,
         "builtinProxies": builtin_nodes,

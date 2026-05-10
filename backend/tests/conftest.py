@@ -47,13 +47,6 @@ def client(db):
 
 
 @pytest.fixture
-def registered_user(client):
-    client.post("/auth/register", json={"username": "testuser", "password": "testpass123"})
-    return {"username": "testuser", "password": "testpass123"}
-
-
-@pytest.fixture
-def auth_headers(client, registered_user):
-    resp = client.post("/auth/login", json=registered_user)
-    token = resp.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+def auth_headers():
+    """Auth was removed; kept as an empty header dict so existing tests keep working."""
+    return {}

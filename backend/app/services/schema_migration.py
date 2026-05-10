@@ -103,7 +103,6 @@ def _get_or_create_request(session: Session, job: BuildJob) -> tuple[BuildReques
 
     request = BuildRequest(
         request_id=job.task_id,
-        user_id=job.user_id,
         h5_url=job.h5_url,
         app_name="H5 App",
         requested_platforms=job.requested_platforms,

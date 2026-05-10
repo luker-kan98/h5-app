@@ -34,15 +34,6 @@ def _build_files(icon_stream=None, icon_name="icon.png", icon_content_type="imag
     return files
 
 
-def test_submit_build_requires_auth(client):
-    resp = client.post(
-        "/build",
-        data=_build_form_data(),
-        files=_build_files(),
-    )
-    assert resp.status_code in (401, 403)
-
-
 def test_submit_build_success_creates_request_and_task(client, auth_headers, tmp_path, db):
     from app.models.build_request import BuildRequest
     from app.models.build_task import BuildTask
@@ -252,13 +243,9 @@ def test_submit_build_rejects_invalid_platform(client, auth_headers, tmp_path):
 def test_get_build_status_returns_s3_download_url(client, auth_headers, db):
     from app.models.build_request import BuildRequest
     from app.models.build_task import BuildTask
-    from app.models.user import User
-
-    user = db.query(User).filter(User.username == "testuser").one()
 
     request = BuildRequest(
         request_id="request-s3-status",
-        user_id=user.id,
         h5_url="https://example.com",
         app_name="Example App",
         requested_platforms=json.dumps(["android"]),
@@ -296,13 +283,9 @@ def test_get_build_status_returns_s3_download_url(client, auth_headers, db):
 def test_download_file_redirects_to_s3_url(client, auth_headers, db):
     from app.models.build_request import BuildRequest
     from app.models.build_task import BuildTask
-    from app.models.user import User
-
-    user = db.query(User).filter(User.username == "testuser").one()
 
     request = BuildRequest(
         request_id="request-s3-download",
-        user_id=user.id,
         h5_url="https://example.com",
         app_name="Example App",
         requested_platforms=json.dumps(["android"]),

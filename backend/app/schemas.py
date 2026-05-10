@@ -1,22 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field
-
-
-# Auth
-class RegisterRequest(BaseModel):
-    username: str = Field(..., min_length=3, max_length=64)
-    password: str = Field(..., min_length=8)
-
-
-class LoginRequest(BaseModel):
-    username: str = Field(..., min_length=1)
-    password: str = Field(..., min_length=1)
-
-
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
+from pydantic import BaseModel
 
 
 # Build

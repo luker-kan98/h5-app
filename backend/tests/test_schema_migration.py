@@ -6,22 +6,14 @@ from sqlalchemy.orm import sessionmaker
 
 def _seed_legacy_data(engine):
     from app.models.build_job import BuildJob
-    from app.models.user import User
 
-    User.__table__.create(bind=engine)
     BuildJob.__table__.create(bind=engine)
 
     SessionFactory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     session = SessionFactory()
     try:
-        user = User(username="legacy-user", password="x")
-        session.add(user)
-        session.commit()
-        session.refresh(user)
-
         job = BuildJob(
             task_id="legacy-request-id",
-            user_id=user.id,
             h5_url="https://example.com",
             status="done",
             requested_platforms=json.dumps(["android", "ios"]),

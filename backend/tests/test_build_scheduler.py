@@ -4,15 +4,9 @@ from unittest.mock import MagicMock, patch
 def _seed_request(db, platform="android"):
     from app.models.build_request import BuildRequest
     from app.models.build_task import BuildTask
-    from app.models.user import User
-
-    user = User(username=f"user-{platform}", password="x")
-    db.add(user)
-    db.commit()
 
     request = BuildRequest(
         request_id=f"request-{platform}",
-        user_id=user.id,
         h5_url="https://example.com",
         app_name="Example App",
         requested_platforms=f'["{platform}"]',

@@ -175,6 +175,7 @@ def test_proxy_sdk_in_catalog():
     field_names = {f.name for f in proxy.fields}
     assert field_names == {
         "ossUrls",
+        "domainConfigUrls",
         "updateIntervalHours",
         "dnsTxtDomains",
         "builtinProxies",

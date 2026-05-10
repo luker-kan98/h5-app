@@ -36,6 +36,8 @@ class ProxyRuntime {
     this._cacheDir = cacheDir;
     const binaryName = platform === 'win32' ? 'sing-box.exe' : 'sing-box';
     const binaryPath = path.join(resourcesPath, 'singbox', binaryName);
+    console.log('[proxy-runtime] start platform=%s cacheDir=%s binary=%s exists=%s',
+      platform, cacheDir, binaryPath, fs.existsSync(binaryPath));
 
     this.supervisor = new SingboxSupervisor({
       binaryPath,
@@ -47,6 +49,7 @@ class ProxyRuntime {
       dnsTxtDomains: config.dnsTxtDomains || [],
     });
     await this.pool.bootstrap();
+    console.log('[proxy-runtime] pool bootstrap done; nodes=%d', this.pool.nodes.length);
 
     this.selector = new ProbeSelector({
       h5Url,
@@ -54,16 +57,19 @@ class ProxyRuntime {
     });
     const winner = await this.selector.pick(this.pool.nodes);
     if (!winner) {
+      console.error('[proxy-runtime] no healthy node — proxy disabled');
       this.isHealthy = false;
       await this.supervisor.stop();
       return;
     }
+    console.log('[proxy-runtime] winner=%s', winner.name);
     this.isHealthy = true;
     this.attachGaveUp(this.supervisor);
 
     const intervalMs = (Number(config.updateIntervalHours) || 1) * 3600 * 1000;
     this._timer = setInterval(() => {
-      this.pool.refresh().catch(() => { /* swallow */ });
+      console.log('[proxy-runtime] periodic pool refresh (every %d ms)', intervalMs);
+      this.pool.refresh().catch((e) => console.warn('[proxy-runtime] refresh threw:', e));
     }, intervalMs);
   }
 
@@ -74,7 +80,9 @@ class ProxyRuntime {
    */
   attachGaveUp(supervisor) {
     if (!supervisor || !supervisor.gaveUp) return;
-    const onGiveUp = () => {
+    const onGiveUp = (err) => {
+      console.warn('[proxy-runtime] supervisor gaveUp%s — flipping isHealthy=false',
+        err ? ' (error: ' + (err.message || err) + ')' : '');
       this.isHealthy = false;
       if (this._timer) { clearInterval(this._timer); this._timer = null; }
     };

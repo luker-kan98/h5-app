@@ -31,7 +31,12 @@ class NodePool {
     const oss = await this._gatherOss();
     const txt = await this._gatherDnsTxt();
     const merged = [...this.builtin, ...oss, ...txt];
-    if (merged.length === 0 && this._nodes.length > 0) return;
+    console.log('[node-pool] refresh: builtin=%d oss=%d dnsTxt=%d → merged=%d',
+      this.builtin.length, oss.length, txt.length, merged.length);
+    if (merged.length === 0 && this._nodes.length > 0) {
+      console.warn('[node-pool] refresh produced empty pool — keeping previous %d node(s)', this._nodes.length);
+      return;
+    }
     this._nodes = merged;
   }
 
@@ -43,12 +48,21 @@ class NodePool {
         const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
         const resp = await this._fetch(url, { signal: ctrl.signal });
         clearTimeout(t);
-        if (!resp.ok) return;
-        const data = await resp.json();
-        for (const raw of (data.proxies || [])) {
-          try { out.push(validateNode(raw)); } catch (_) { /* drop bad entries */ }
+        if (!resp.ok) {
+          console.warn('[node-pool] OSS %s → HTTP %d', url, resp.status);
+          return;
         }
-      } catch (_) { /* swallow per-URL failure */ }
+        const data = await resp.json();
+        let added = 0;
+        for (const raw of (data.proxies || [])) {
+          try { out.push(validateNode(raw)); added++; } catch (e) {
+            console.warn('[node-pool] OSS %s drop bad entry:', url, e.message);
+          }
+        }
+        console.log('[node-pool] OSS %s → %d node(s) accepted', url, added);
+      } catch (e) {
+        console.warn('[node-pool] OSS %s fetch failed:', url, e.message);
+      }
     }));
     return out;
   }
@@ -64,15 +78,22 @@ class NodePool {
           { headers: { 'Accept': 'application/dns-json' }, signal: ctrl.signal },
         );
         clearTimeout(t);
-        if (!resp.ok) return;
+        if (!resp.ok) {
+          console.warn('[node-pool] DoH %s → HTTP %d', domain, resp.status);
+          return;
+        }
         const data = await resp.json();
+        let added = 0;
         for (const ans of (data.Answer || [])) {
           const raw = String(ans.data || '').replace(/"/g, '').trim();
           if (!raw.startsWith('ss://')) continue;
           const node = parseSsUri(raw);
-          if (node) out.push(node);
+          if (node) { out.push(node); added++; }
         }
-      } catch (_) { /* swallow */ }
+        console.log('[node-pool] DoH %s → %d node(s) accepted', domain, added);
+      } catch (e) {
+        console.warn('[node-pool] DoH %s failed:', domain, e.message);
+      }
     }));
     return out;
   }
