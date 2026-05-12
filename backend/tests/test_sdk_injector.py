@@ -419,3 +419,17 @@ def test_apply_electron_la51_prepends_before_user_customjs(tmp_path):
     user_pos = out.find("MY_FLAG")
     assert la_pos != -1 and user_pos != -1
     assert la_pos < user_pos
+
+
+def test_apply_electron_la51_disabled_noop(tmp_path):
+    main_js = tmp_path / "main.js"
+    main_js.write_text(
+        "const CUSTOM_JS = '__CUSTOM_JS__';\n"
+        "const SDK_CONFIGS = '__SDK_CONFIGS__';\n",
+        encoding="utf-8",
+    )
+    sdk_injector.apply_electron(tmp_path, "var x = 1;", {})
+    out = main_js.read_text(encoding="utf-8")
+    assert "51.la" not in out
+    assert "LA.init" not in out
+    assert "var x = 1;" in out
