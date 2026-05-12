@@ -259,15 +259,27 @@ def apply_electron(
     custom_js: str | None,
     sdk_configs: dict[str, dict[str, Any]],
 ) -> None:
-    """Replace placeholders in electron-wrapper/main.js with the custom JS + SDK config."""
+    """Replace placeholders in electron-wrapper/main.js with the custom JS + SDK config.
+
+    If 51LA is enabled, prepends its JS bootstrap to custom_js and strips the
+    la51 sub-object from the __SDK_CONFIGS__ payload.
+    """
     electron_path = Path(electron_dir)
     main_js = electron_path / "main.js"
     text = main_js.read_text(encoding="utf-8")
 
+    # Defensive deepcopy so callers aren't surprised by in-place mutation.
+    sanitized_configs = copy.deepcopy(sdk_configs)
+    merged_custom_js = _materialize_la51_into_custom_js(
+        custom_js, sanitized_configs
+    )
+
     replacements = {
-        ELECTRON_CUSTOM_JS_PLACEHOLDER: _js_safe_literal(json.dumps(custom_js or "")),
+        ELECTRON_CUSTOM_JS_PLACEHOLDER: _js_safe_literal(
+            json.dumps(merged_custom_js or "")
+        ),
         ELECTRON_SDK_CONFIGS_PLACEHOLDER: _js_safe_literal(
-            json.dumps(sdk_configs, ensure_ascii=False)
+            json.dumps(sanitized_configs, ensure_ascii=False)
         ),
     }
 

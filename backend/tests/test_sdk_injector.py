@@ -378,3 +378,44 @@ def test_apply_flutter_la51_disabled_noop(tmp_path):
     assert "LA.init" not in out
     # User JS still flows through unchanged.
     assert "var x = 1;" in out
+
+
+def test_apply_electron_la51_injects_snippet(tmp_path):
+    main_js = tmp_path / "main.js"
+    main_js.write_text(
+        "const CUSTOM_JS = '__CUSTOM_JS__';\n"
+        "const SDK_CONFIGS = '__SDK_CONFIGS__';\n",
+        encoding="utf-8",
+    )
+    sdk_injector.apply_electron(
+        tmp_path,
+        None,
+        {"la51": {"maskId": "Abc123", "autoTrack": True}},
+    )
+    out = main_js.read_text(encoding="utf-8")
+    # 51LA bootstrap is embedded in the CUSTOM_JS string literal (JSON-encoded,
+    # so single quotes are unescaped but the source is one big string).
+    assert "sdk.51.la/js-sdk-pro.min.js" in out
+    assert "id:'Abc123'" in out
+    assert "autoTrack:true" in out
+    # la51 sub-object stripped from SDK_CONFIGS.
+    assert '"la51"' not in out
+
+
+def test_apply_electron_la51_prepends_before_user_customjs(tmp_path):
+    main_js = tmp_path / "main.js"
+    main_js.write_text(
+        "const CUSTOM_JS = '__CUSTOM_JS__';\n"
+        "const SDK_CONFIGS = '__SDK_CONFIGS__';\n",
+        encoding="utf-8",
+    )
+    sdk_injector.apply_electron(
+        tmp_path,
+        "window.MY_FLAG = 1;",
+        {"la51": {"maskId": "Abc123"}},
+    )
+    out = main_js.read_text(encoding="utf-8")
+    la_pos = out.find("sdk.51.la")
+    user_pos = out.find("MY_FLAG")
+    assert la_pos != -1 and user_pos != -1
+    assert la_pos < user_pos
