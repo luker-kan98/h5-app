@@ -292,3 +292,48 @@ def test_apply_flutter_appvue_missing_native_files_is_safe(tmp_path):
         {"appvue": {"key": "K", "secret": "S"}},
     )
     # No assertion needed — call shouldn't raise.
+
+
+def test_render_la51_snippet_basic():
+    snippet = sdk_injector._render_la51_snippet(
+        {"maskId": "KrDopMys2nnwBDrx"}
+    )
+    # Loads the official CDN script + initializes with id+ck set to MaskId.
+    assert "sdk.51.la/js-sdk-pro.min.js" in snippet
+    assert "id:'KrDopMys2nnwBDrx'" in snippet
+    assert "ck:'KrDopMys2nnwBDrx'" in snippet
+    # Defaults: autoTrack/hashMode false when not given.
+    assert "autoTrack:false" in snippet
+    assert "hashMode:false" in snippet
+    # DOM injection (not document.write) because runJavaScript runs post-load.
+    assert "createElement('script')" in snippet
+    assert "document.write" not in snippet
+
+
+def test_render_la51_snippet_with_options():
+    snippet = sdk_injector._render_la51_snippet({
+        "maskId": "Abc123",
+        "autoTrack": True,
+        "hashMode": True,
+    })
+    assert "autoTrack:true" in snippet
+    assert "hashMode:true" in snippet
+
+
+def test_render_la51_snippet_truthy_strings_normalize_to_bool():
+    """validate_sdk_configs allows boolean-ish primitives through; the
+    renderer must coerce them to actual JS true/false literals."""
+    snippet = sdk_injector._render_la51_snippet({
+        "maskId": "Abc123",
+        "autoTrack": "true",
+        "hashMode": 1,
+    })
+    assert "autoTrack:true" in snippet
+    assert "hashMode:true" in snippet
+    snippet2 = sdk_injector._render_la51_snippet({
+        "maskId": "Abc123",
+        "autoTrack": "false",
+        "hashMode": 0,
+    })
+    assert "autoTrack:false" in snippet2
+    assert "hashMode:false" in snippet2

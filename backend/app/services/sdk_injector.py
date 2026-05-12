@@ -118,6 +118,50 @@ def _apply_appvue_native(
         plist.write_text(text, encoding="utf-8")
 
 
+def _to_js_bool(value: Any) -> str:
+    """Coerce a Python primitive into a JS boolean literal.
+
+    Mirrors the lenient parsing used by `_normalize_proxy.disableDirect`:
+    accepts True/False, 1/0, and the case-insensitive strings
+    "true"/"1"/"yes" / "false"/"0"/"no"/"". Anything else is treated as
+    falsy. Returns the literal string "true" or "false" — safe to embed
+    directly in rendered JS source.
+    """
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return "true" if value else "false"
+    if isinstance(value, str):
+        return "true" if value.strip().lower() in ("true", "1", "yes") else "false"
+    return "false"
+
+
+def _render_la51_snippet(cfg: dict[str, Any]) -> str:
+    """Produce the 51LA boot JS that loads the CDN script + runs LA.init.
+
+    The caller (apply_flutter / apply_electron) prepends this to user-supplied
+    custom_js. MaskId is assumed already validated against ^[A-Za-z0-9]{1,32}$
+    by sdk_catalog.validate_sdk_configs, so we can safely embed it in single
+    quotes without further escaping.
+    """
+    mask_id = cfg["maskId"]
+    auto_track = _to_js_bool(cfg.get("autoTrack"))
+    hash_mode = _to_js_bool(cfg.get("hashMode"))
+    return (
+        "(function(){"
+        "var s=document.createElement('script');"
+        "s.charset='UTF-8';"
+        "s.id='LA_COLLECT';"
+        "s.src='https://sdk.51.la/js-sdk-pro.min.js';"
+        "s.onload=function(){"
+        f"if(window.LA)LA.init({{id:'{mask_id}',ck:'{mask_id}',"
+        f"autoTrack:{auto_track},hashMode:{hash_mode}}});"
+        "};"
+        "document.head.appendChild(s);"
+        "})();"
+    )
+
+
 def _materialize_firebase_files(
     flutter_path: Path,
     sdk_configs: dict[str, dict[str, Any]],
