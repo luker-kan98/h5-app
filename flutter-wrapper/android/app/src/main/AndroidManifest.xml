@@ -1,5 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
     <application
         android:label="h5_app"
         android:name="${applicationName}"
@@ -34,10 +36,10 @@
             android:value="2" />
         <meta-data
             android:name="com.appvue.sdk.KEY"
-            android:value="3w4ldfzj" />
+            android:value="__APPVUE_KEY__" />
         <meta-data
             android:name="com.appvue.sdk.SECRET"
-            android:value="vu3w4ldfzj" />
+            android:value="__APPVUE_SECRET__" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

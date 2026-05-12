@@ -53,9 +53,9 @@
 		</dict>
 	</dict>
 	<key>AppVueKey</key>
-	<string>3w4ldfzj</string>
+	<string>__APPVUE_KEY__</string>
 	<key>AppVueSecret</key>
-	<string>vu3w4ldfzj</string>
+	<string>__APPVUE_SECRET__</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

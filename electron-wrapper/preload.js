@@ -16,10 +16,12 @@ contextBridge.exposeInMainWorld('h5app', {
   },
   crash: {
     captureException: (err) => {
-      console.debug('[h5app.crash.captureException]', err);
+      const msg = (err && err.message) ? err.message : String(err);
+      const stack = (err && err.stack) ? err.stack : '';
+      ipcRenderer.invoke('sentry:captureException', { message: msg, stack });
     },
     captureMessage: (msg) => {
-      console.debug('[h5app.crash.captureMessage]', msg);
+      ipcRenderer.invoke('sentry:captureMessage', String(msg));
     },
   },
 });

@@ -15,7 +15,7 @@ from app.services.url_validator import UrlValidationError, validate_h5_url
 
 
 VALID_PLATFORMS = {"android", "ios", "macos", "windows"}
-VALID_CATEGORIES = {"analytics", "crash", "push", "network"}
+VALID_CATEGORIES = {"analytics", "crash", "network"}
 
 
 @dataclass(frozen=True)
@@ -54,6 +54,22 @@ CATALOG: dict[str, SdkDefinition] = {
             SdkField(name="dsn", label_en="DSN", label_zh="DSN", secret=True),
         ),
     ),
+    "appvue": SdkDefinition(
+        id="appvue",
+        name_en="AppVue Attribution",
+        name_zh="AppVue 拉新归因",
+        category="analytics",
+        supported_platforms=("android", "ios"),
+        fields=(
+            SdkField(name="key", label_en="App Key", label_zh="AppKey", secret=True),
+            SdkField(
+                name="secret",
+                label_en="App Secret",
+                label_zh="AppSecret",
+                secret=True,
+            ),
+        ),
+    ),
     "umeng": SdkDefinition(
         id="umeng",
         name_en="Umeng Analytics",
@@ -80,29 +96,6 @@ CATALOG: dict[str, SdkDefinition] = {
                 label_en="Channel",
                 label_zh="渠道",
                 required=False,
-            ),
-        ),
-    ),
-    "jpush": SdkDefinition(
-        id="jpush",
-        name_en="JPush (Aurora Push)",
-        name_zh="极光推送",
-        category="push",
-        supported_platforms=("android", "ios"),
-        fields=(
-            SdkField(
-                name="androidAppKey",
-                label_en="Android App Key",
-                label_zh="Android AppKey",
-                secret=True,
-                platforms=("android",),
-            ),
-            SdkField(
-                name="iosAppKey",
-                label_en="iOS App Key",
-                label_zh="iOS AppKey",
-                secret=True,
-                platforms=("ios",),
             ),
         ),
     ),

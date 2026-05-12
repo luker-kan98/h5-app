@@ -32,6 +32,19 @@ target 'Runner' do
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 
   pod 'AppVueSDK', :path => '.'
+  pod 'Sentry', '~> 8.36'
+  pod 'UMCommon', '~> 7.6.0'
+  pod 'UMDevice', '~> 2.2.0'
+  pod 'UMAPM', '~> 1.6.0'
+  pod 'UMCCommonLog', '~> 1.0.0'
+
+  # Firebase pods are installed only when the packager has injected
+  # GoogleService-Info.plist into Runner/. Skipping them keeps non-Firebase
+  # builds free of the Firebase BoM download + linker overhead.
+  if File.exist?(File.join(__dir__, 'Runner', 'GoogleService-Info.plist'))
+    pod 'Firebase/Analytics', '~> 11.0'
+    pod 'Firebase/Crashlytics', '~> 11.0'
+  end
 
   target 'RunnerTests' do
     inherit! :search_paths

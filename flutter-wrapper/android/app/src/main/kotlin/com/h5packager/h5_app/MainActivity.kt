@@ -9,13 +9,23 @@ import com.appvue.sdk.api.TrackData
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import com.umeng.analytics.MobclickAgent
+import com.umeng.commonsdk.UMConfigure
+import io.sentry.Sentry
+import io.sentry.SentryLevel
+import io.sentry.android.core.SentryAndroid
 
 class MainActivity : FlutterActivity() {
     companion object {
         private const val CHANNEL = "com.h5packager.h5_app/appvue"
+        private const val SENTRY_CHANNEL = "com.h5packager.h5_app/sentry"
+        private const val UMENG_CHANNEL = "com.h5packager.h5_app/umeng"
+        private const val FIREBASE_CHANNEL = "com.h5packager.h5_app/firebase"
     }
 
     private var channel: MethodChannel? = null
+    private var sentryInitialized = false
+    private var umengInitialized = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AppVue.preInit(this)
@@ -97,6 +107,165 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SENTRY_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "init" -> {
+                        val dsn = call.argument<String>("dsn")
+                        if (dsn.isNullOrBlank()) {
+                            result.success(false)
+                        } else {
+                            try {
+                                SentryAndroid.init(applicationContext) { options ->
+                                    options.dsn = dsn
+                                }
+                                sentryInitialized = true
+                                result.success(true)
+                            } catch (e: Throwable) {
+                                result.error("SENTRY_INIT_FAILED", e.message, null)
+                            }
+                        }
+                    }
+                    "captureException" -> {
+                        if (!sentryInitialized) { result.success(false); return@setMethodCallHandler }
+                        val msg = call.argument<String>("message") ?: "(no message)"
+                        val stack = call.argument<String>("stack") ?: ""
+                        Sentry.captureException(RuntimeException("$msg\n$stack"))
+                        result.success(true)
+                    }
+                    "captureMessage" -> {
+                        if (!sentryInitialized) { result.success(false); return@setMethodCallHandler }
+                        val msg = call.argument<String>("message") ?: ""
+                        Sentry.captureMessage(msg, SentryLevel.INFO)
+                        result.success(true)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, UMENG_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "init" -> {
+                        val appKey = call.argument<String>("appKey")
+                        if (appKey.isNullOrBlank()) {
+                            result.success(false)
+                        } else {
+                            try {
+                                val channelName = call.argument<String>("channel") ?: "default"
+                                UMConfigure.preInit(applicationContext, appKey, channelName)
+                                UMConfigure.init(
+                                    applicationContext,
+                                    appKey,
+                                    channelName,
+                                    UMConfigure.DEVICE_TYPE_PHONE,
+                                    null
+                                )
+                                MobclickAgent.setPageCollectionMode(
+                                    MobclickAgent.PageMode.AUTO
+                                )
+                                umengInitialized = true
+                                result.success(true)
+                            } catch (e: Throwable) {
+                                result.error("UMENG_INIT_FAILED", e.message, null)
+                            }
+                        }
+                    }
+                    "logEvent" -> {
+                        if (!umengInitialized) { result.success(false); return@setMethodCallHandler }
+                        val name = call.argument<String>("name")
+                        if (name.isNullOrBlank()) {
+                            result.error("INVALID_ARGUMENT", "name is required", null)
+                            return@setMethodCallHandler
+                        }
+                        val rawProps = call.argument<Map<String, Any?>>("props")
+                        if (rawProps.isNullOrEmpty()) {
+                            MobclickAgent.onEvent(applicationContext, name)
+                        } else {
+                            val stringProps = HashMap<String, String>(rawProps.size)
+                            for ((k, v) in rawProps) {
+                                if (v != null) stringProps[k] = v.toString()
+                            }
+                            MobclickAgent.onEventObject(applicationContext, name, stringProps as Map<String, Any>)
+                        }
+                        result.success(true)
+                    }
+                    "setUserId" -> {
+                        if (!umengInitialized) { result.success(false); return@setMethodCallHandler }
+                        val id = call.argument<String>("id")
+                        if (id.isNullOrEmpty()) {
+                            MobclickAgent.onProfileSignOff()
+                        } else {
+                            MobclickAgent.onProfileSignIn(id)
+                        }
+                        result.success(true)
+                    }
+                    "setUserProperty" -> {
+                        if (!umengInitialized) { result.success(false); return@setMethodCallHandler }
+                        val key = call.argument<String>("key")
+                        val value = call.argument<String>("value")
+                        if (key.isNullOrBlank()) {
+                            result.error("INVALID_ARGUMENT", "key is required", null)
+                            return@setMethodCallHandler
+                        }
+                        // Umeng has no native user-property API; encode as a synthetic event.
+                        MobclickAgent.onEventObject(
+                            applicationContext,
+                            "__user_property",
+                            mapOf("key" to key, "value" to (value ?: ""))
+                        )
+                        result.success(true)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FIREBASE_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "init" -> result.success(FirebaseBridgeHelper.init(applicationContext))
+                    "logEvent" -> {
+                        if (!FirebaseBridgeHelper.isReady) { result.success(false); return@setMethodCallHandler }
+                        val name = call.argument<String>("name")
+                        if (name.isNullOrBlank()) {
+                            result.error("INVALID_ARGUMENT", "name is required", null)
+                            return@setMethodCallHandler
+                        }
+                        FirebaseBridgeHelper.logEvent(name, call.argument<Map<String, Any?>>("props"))
+                        result.success(true)
+                    }
+                    "setUserId" -> {
+                        if (!FirebaseBridgeHelper.isReady) { result.success(false); return@setMethodCallHandler }
+                        FirebaseBridgeHelper.setUserId(call.argument<String>("id"))
+                        result.success(true)
+                    }
+                    "setUserProperty" -> {
+                        if (!FirebaseBridgeHelper.isReady) { result.success(false); return@setMethodCallHandler }
+                        val key = call.argument<String>("key")
+                        if (key.isNullOrBlank()) {
+                            result.error("INVALID_ARGUMENT", "key is required", null)
+                            return@setMethodCallHandler
+                        }
+                        FirebaseBridgeHelper.setUserProperty(key, call.argument<String>("value"))
+                        result.success(true)
+                    }
+                    "captureException" -> {
+                        if (!FirebaseBridgeHelper.isReady) { result.success(false); return@setMethodCallHandler }
+                        FirebaseBridgeHelper.captureException(
+                            call.argument<String>("message") ?: "(no message)",
+                            call.argument<String>("stack") ?: ""
+                        )
+                        result.success(true)
+                    }
+                    "captureMessage" -> {
+                        if (!FirebaseBridgeHelper.isReady) { result.success(false); return@setMethodCallHandler }
+                        FirebaseBridgeHelper.captureMessage(call.argument<String>("message") ?: "")
+                        result.success(true)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
     }
 
     override fun onNewIntent(intent: Intent) {

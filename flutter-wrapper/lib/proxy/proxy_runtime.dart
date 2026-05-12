@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart' as path_provider;
 
+import 'file_logger.dart';
 import 'node_pool.dart';
 import 'probe_selector.dart';
 import 'proxy_controller.dart';
@@ -43,6 +44,11 @@ class ProxyRuntime {
 
     final cacheDir = await path_provider.getApplicationCacheDirectory();
     final binaryPath = await _resolveBinaryPath();
+    pLogf(
+      'info',
+      '[runtime] start platform=%s cacheDir=%s binary=%s disableDirect=%s',
+      [Platform.operatingSystem, cacheDir.path, binaryPath, disableDirect],
+    );
 
     _supervisor = SingboxSupervisor(
       binaryPath: binaryPath,
@@ -70,12 +76,15 @@ class ProxyRuntime {
         .toList();
     final intervalH = (config['updateIntervalHours'] as num? ?? 1).toDouble();
 
+    pLogf('info', '[runtime] config: builtin=%s ossUrls=%s dnsTxt=%s intervalH=%s',
+        [builtin.length, ossUrls.length, dnsTxtDomains.length, intervalH]);
     _pool = NodePool(
       builtin: builtin,
       ossUrls: ossUrls,
       dnsTxtDomains: dnsTxtDomains,
     );
     await _pool.bootstrap();
+    pLogf('info', '[runtime] pool bootstrap done; nodes=%s', [_pool.nodes.length]);
 
     _selector = ProbeSelector(
       h5Url: h5Url,
@@ -84,21 +93,30 @@ class ProxyRuntime {
 
     final winner = await _selector.pick(_pool.nodes);
     if (winner == null) {
+      pLog('error', '[runtime] no healthy node — proxy disabled');
       _isHealthy = false;
       await _supervisor.stop();
       return;
     }
+    pLogf('info', '[runtime] winner=%s', [winner.name]);
 
     final supported = await WebViewProxyController.isSupported();
     if (!supported) {
-      debugPrint('proxy: PROXY_OVERRIDE not supported on this WebView');
+      pLog('error', '[runtime] PROXY_OVERRIDE not supported on this WebView');
       _isHealthy = false;
       return;
     }
-    await WebViewProxyController.setHttpProxy(
-      'http://${_supervisor.httpAddress}',
-    );
+    final url = 'http://${_supervisor.httpAddress}';
+    try {
+      await WebViewProxyController.setHttpProxy(url);
+      pLogf('info', '[runtime] WebView proxy override -> %s', [url]);
+    } catch (e) {
+      pLogf('error', '[runtime] setHttpProxy failed: %s', [e]);
+      _isHealthy = false;
+      return;
+    }
     _isHealthy = true;
+    pLog('info', '[runtime] healthy');
 
     // If sing-box later crashes past its restart budget, stop trusting the
     // proxy. Callers that gate UI on `isHealthy` (notably main.dart's error

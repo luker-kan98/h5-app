@@ -34,7 +34,8 @@ def test_sdk_catalog_endpoint(client):
     body = resp.json()
     assert "sdks" in body
     ids = {s["id"] for s in body["sdks"]}
-    assert {"sentry", "umeng", "jpush", "firebase"} <= ids
+    assert {"sentry", "umeng", "firebase", "appvue"} <= ids
+    assert "jpush" not in ids
 
 
 def _patches():

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'file_logger.dart';
 import 'proxy_node.dart';
 
 /// Factory for creating a process. Returns a handle that exposes
@@ -17,7 +18,21 @@ typedef ProcessFactory = Future<dynamic> Function(
 
 class _RealProcessAdapter {
   final Process _proc;
-  _RealProcessAdapter(this._proc);
+  _RealProcessAdapter(this._proc) {
+    // Tee sing-box's own stdout/stderr (it logs DNS lookups, dial errors,
+    // outbound failures, etc.) into our durable file logger so the user can
+    // diagnose without an attached debugger. sing-box already prints with its
+    // own timestamps; we add level=info/error and a tag so the merged log is
+    // greppable.
+    _proc.stdout.transform(utf8.decoder).transform(const LineSplitter()).listen(
+      (line) => pLog('info', '[sing-box] $line'),
+      onError: (Object e) => pLog('error', '[sing-box] stdout error: $e'),
+    );
+    _proc.stderr.transform(utf8.decoder).transform(const LineSplitter()).listen(
+      (line) => pLog('warn', '[sing-box] $line'),
+      onError: (Object e) => pLog('error', '[sing-box] stderr error: $e'),
+    );
+  }
   int get pid => _proc.pid;
   Future<int> get exitCode => _proc.exitCode;
   void kill() => _proc.kill();
@@ -65,6 +80,14 @@ class SingboxSupervisor {
 
   Future<void> _spawn() async {
     if (_stopped) return;
+    final node = _currentNode;
+    if (node != null) {
+      pLogf(
+        'info',
+        '[supervisor] spawn binary=%s socks=%s http=%s node=%s server=%s:%s cipher=%s',
+        [binaryPath, socksAddress, httpAddress, node.name, node.server, node.port, node.cipher],
+      );
+    }
     // If a previous process is still running (e.g. from probe-selector
     // walking through candidate nodes), terminate it before spawning the
     // next one. Otherwise we accumulate orphan sing-box processes.
@@ -127,7 +150,9 @@ class SingboxSupervisor {
 
   String _renderConfig(ProxyNode node) {
     return const JsonEncoder.withIndent('  ').convert({
-      'log': {'level': 'warn', 'disabled': false},
+      // 'info' so dial errors / dns lookups for the SS server show up in our
+      // tee'd log; the file rotates at 1MB so noise is bounded.
+      'log': {'level': 'info', 'disabled': false, 'timestamp': true},
       'inbounds': [
         {
           'type': 'socks',

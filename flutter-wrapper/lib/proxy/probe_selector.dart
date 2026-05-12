@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'file_logger.dart';
 import 'proxy_node.dart';
 
 typedef ProbeFn = Future<bool> Function(ProxyNode node, String h5Url);
@@ -25,17 +26,25 @@ class ProbeSelector {
   ProbeFn get _probe => _userProbe ?? _defaultProbe;
 
   Future<ProxyNode?> pick(List<ProxyNode> nodes) async {
+    pLogf('info', '[probe] pick start: %s candidate node(s) for %s',
+        [nodes.length, h5Url]);
     for (final node in nodes) {
+      pLogf('info', '[probe] trying node name=%s server=%s:%s',
+          [node.name, node.server, node.port]);
       await supervisor.startWith(node);
       // Brief delay so sing-box has time to bind sockets. Tests inject a
       // synthetic probe so the delay is paid only in production paths.
       await Future<void>.delayed(const Duration(milliseconds: 200));
       try {
-        if (await _probe(node, h5Url)) return node;
-      } catch (_) {
-        // probe failure is non-fatal; try the next node
+        final ok = await _probe(node, h5Url);
+        pLogf('info', '[probe] result for %s: %s',
+            [node.name, ok ? 'PASS' : 'FAIL']);
+        if (ok) return node;
+      } catch (e) {
+        pLogf('warn', '[probe] error for %s: %s', [node.name, e]);
       }
     }
+    pLog('error', '[probe] no node passed probe — pool exhausted');
     return null;
   }
 
@@ -63,8 +72,12 @@ class ProbeSelector {
           .timeout(const Duration(seconds: 5));
       final resp = await req.close().timeout(const Duration(seconds: 5));
       await resp.drain<void>();
+      pLogf('info', '[probe] HEAD %s via %s -> status=%s',
+          [h5Url, httpAddress, resp.statusCode]);
       return resp.statusCode >= 200 && resp.statusCode < 400;
-    } catch (_) {
+    } catch (e) {
+      pLogf('warn', '[probe] HEAD %s via %s threw: %s',
+          [h5Url, httpAddress, e]);
       return false;
     } finally {
       client.close(force: true);

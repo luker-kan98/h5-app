@@ -5,6 +5,25 @@ const H5_URL = '__H5_URL__';
 const CUSTOM_JS = '__CUSTOM_JS__';
 const SDK_CONFIGS = '__SDK_CONFIGS__';
 
+let sentry = null;
+let sentryInitialized = false;
+function bootSentryIfConfigured() {
+  const dsn = (typeof SDK_CONFIGS === 'object' && SDK_CONFIGS && SDK_CONFIGS.sentry)
+    ? SDK_CONFIGS.sentry.dsn : null;
+  if (!dsn) {
+    console.log('[sentry] no dsn; skipping init');
+    return;
+  }
+  try {
+    sentry = require('@sentry/electron/main');
+    sentry.init({ dsn });
+    sentryInitialized = true;
+    console.log('[sentry] initialized');
+  } catch (e) {
+    console.error('[sentry] init failed:', e);
+  }
+}
+
 const fileLogger = require('./proxy/file-logger');
 // Install the file logger BEFORE requiring proxy modules so module-load-time
 // console output (none today, but cheap insurance) and every subsequent log
@@ -178,6 +197,22 @@ ipcMain.handle('proxy:openLogs', () => {
   if (file) shell.showItemInFolder(file);
 });
 
+ipcMain.handle('sentry:captureException', (_e, payload) => {
+  if (!sentryInitialized || !sentry) return false;
+  const msg = (payload && payload.message) || '(no message)';
+  const stack = (payload && payload.stack) || '';
+  const err = new Error(msg);
+  if (stack) err.stack = stack;
+  sentry.captureException(err);
+  return true;
+});
+
+ipcMain.handle('sentry:captureMessage', (_e, msg) => {
+  if (!sentryInitialized || !sentry) return false;
+  sentry.captureMessage(String(msg || ''));
+  return true;
+});
+
 app.whenReady()
   .then(() => {
     buildAppMenu();
@@ -189,6 +224,7 @@ app.whenReady()
       if (win) win.webContents.toggleDevTools();
     });
   })
+  .then(bootSentryIfConfigured)
   .then(bootProxyIfConfigured)
   .then(resolveH5UrlIfConfigured)
   .then(createWindow);

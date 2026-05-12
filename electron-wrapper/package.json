@@ -9,7 +9,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "socks-proxy-agent": "^8.0.4"
+    "socks-proxy-agent": "^8.0.4",
+    "@sentry/electron": "^5.4.0"
   },
   "devDependencies": {
     "electron": "^31.0.0",

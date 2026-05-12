@@ -1,6 +1,9 @@
+import base64
 import json
 import os
 from pathlib import Path
+
+import pytest
 
 from app.services import sdk_injector
 
@@ -99,3 +102,193 @@ def test_apply_electron_escapes_unicode_line_terminators(tmp_path):
     assert chr(0x2029) not in out
     assert "\\u2028" in out
     assert "\\u2029" in out
+
+
+def _gs_json_bytes() -> bytes:
+    return json.dumps({
+        "project_info": {"project_id": "dummy"},
+        "client": [],
+    }).encode("utf-8")
+
+
+def _plist_xml_bytes() -> bytes:
+    return (
+        b"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        b"<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" "
+        b"\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+        b"<plist version=\"1.0\"><dict>"
+        b"<key>API_KEY</key><string>dummy</string>"
+        b"</dict></plist>\n"
+    )
+
+
+def test_apply_flutter_writes_firebase_files(tmp_path):
+    gs_b64 = base64.b64encode(_gs_json_bytes()).decode("ascii")
+    plist_b64 = base64.b64encode(_plist_xml_bytes()).decode("ascii")
+    sdk_injector.apply_flutter(
+        tmp_path,
+        None,
+        {
+            "firebase": {
+                "androidGoogleServicesJson": gs_b64,
+                "iosGoogleServiceInfoPlist": plist_b64,
+            }
+        },
+    )
+
+    gs_path = tmp_path / "android/app/google-services.json"
+    plist_path = tmp_path / "ios/Runner/GoogleService-Info.plist"
+    assert gs_path.read_bytes() == _gs_json_bytes()
+    assert plist_path.read_bytes() == _plist_xml_bytes()
+
+    # Base64 blobs MUST be stripped from the embedded sdkConfigsJson so the
+    # Dart constant stays compact (and the blobs aren't shipped twice).
+    out = (tmp_path / "lib/sdk_config.dart").read_text(encoding="utf-8")
+    assert "androidGoogleServicesJson" not in out
+    assert "iosGoogleServiceInfoPlist" not in out
+    # The firebase namespace itself can remain (now empty) — that's fine.
+
+
+def test_apply_flutter_firebase_only_android(tmp_path):
+    gs_b64 = base64.b64encode(_gs_json_bytes()).decode("ascii")
+    sdk_injector.apply_flutter(
+        tmp_path,
+        None,
+        {"firebase": {"androidGoogleServicesJson": gs_b64}},
+    )
+    assert (tmp_path / "android/app/google-services.json").exists()
+    assert not (tmp_path / "ios/Runner/GoogleService-Info.plist").exists()
+
+
+def test_apply_flutter_firebase_invalid_base64_raises(tmp_path):
+    with pytest.raises(sdk_injector.FirebaseInjectionError):
+        sdk_injector.apply_flutter(
+            tmp_path,
+            None,
+            {"firebase": {"androidGoogleServicesJson": "***not base64***"}},
+        )
+
+
+def test_apply_flutter_firebase_invalid_json_raises(tmp_path):
+    not_json = base64.b64encode(b"this is not json").decode("ascii")
+    with pytest.raises(sdk_injector.FirebaseInjectionError):
+        sdk_injector.apply_flutter(
+            tmp_path,
+            None,
+            {"firebase": {"androidGoogleServicesJson": not_json}},
+        )
+
+
+def test_apply_flutter_firebase_invalid_plist_raises(tmp_path):
+    not_plist = base64.b64encode(b"definitely not a plist").decode("ascii")
+    with pytest.raises(sdk_injector.FirebaseInjectionError):
+        sdk_injector.apply_flutter(
+            tmp_path,
+            None,
+            {"firebase": {"iosGoogleServiceInfoPlist": not_plist}},
+        )
+
+
+def test_apply_flutter_firebase_binary_plist_accepted(tmp_path):
+    bplist = b"bplist00" + b"\x00" * 32  # plausible bplist magic
+    b64 = base64.b64encode(bplist).decode("ascii")
+    sdk_injector.apply_flutter(
+        tmp_path,
+        None,
+        {"firebase": {"iosGoogleServiceInfoPlist": b64}},
+    )
+    assert (tmp_path / "ios/Runner/GoogleService-Info.plist").read_bytes() == bplist
+
+
+_APPVUE_MANIFEST_FIXTURE = (
+    "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\">\n"
+    "    <application android:label=\"h5_app\">\n"
+    "        <meta-data\n"
+    "            android:name=\"com.appvue.sdk.KEY\"\n"
+    "            android:value=\"__APPVUE_KEY__\" />\n"
+    "        <meta-data\n"
+    "            android:name=\"com.appvue.sdk.SECRET\"\n"
+    "            android:value=\"__APPVUE_SECRET__\" />\n"
+    "    </application>\n"
+    "</manifest>\n"
+)
+
+_APPVUE_PLIST_FIXTURE = (
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+    "<plist version=\"1.0\">\n"
+    "<dict>\n"
+    "\t<key>CFBundleName</key>\n"
+    "\t<string>Runner</string>\n"
+    "\t<key>AppVueKey</key>\n"
+    "\t<string>__APPVUE_KEY__</string>\n"
+    "\t<key>AppVueSecret</key>\n"
+    "\t<string>__APPVUE_SECRET__</string>\n"
+    "\t<key>CFBundleVersion</key>\n"
+    "\t<string>1</string>\n"
+    "</dict>\n"
+    "</plist>\n"
+)
+
+
+def _seed_appvue_fixtures(tmp_path):
+    manifest = tmp_path / "android/app/src/main/AndroidManifest.xml"
+    plist = tmp_path / "ios/Runner/Info.plist"
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    plist.parent.mkdir(parents=True, exist_ok=True)
+    manifest.write_text(_APPVUE_MANIFEST_FIXTURE, encoding="utf-8")
+    plist.write_text(_APPVUE_PLIST_FIXTURE, encoding="utf-8")
+    return manifest, plist
+
+
+def test_apply_flutter_appvue_substitutes_key_and_secret(tmp_path):
+    manifest, plist = _seed_appvue_fixtures(tmp_path)
+    sdk_injector.apply_flutter(
+        tmp_path,
+        None,
+        {"appvue": {"key": "K-abc-123", "secret": "S-xyz-789"}},
+    )
+    m = manifest.read_text(encoding="utf-8")
+    assert "K-abc-123" in m and "S-xyz-789" in m
+    assert "__APPVUE_KEY__" not in m and "__APPVUE_SECRET__" not in m
+
+    p = plist.read_text(encoding="utf-8")
+    assert "<string>K-abc-123</string>" in p
+    assert "<string>S-xyz-789</string>" in p
+    assert "__APPVUE_KEY__" not in p and "__APPVUE_SECRET__" not in p
+
+
+def test_apply_flutter_appvue_disabled_strips_manifest_metadata(tmp_path):
+    manifest, _ = _seed_appvue_fixtures(tmp_path)
+    sdk_injector.apply_flutter(tmp_path, None, {})
+    m = manifest.read_text(encoding="utf-8")
+    # Both meta-data blocks should be gone — placeholders must not leak into shipped APKs.
+    assert "com.appvue.sdk.KEY" not in m
+    assert "com.appvue.sdk.SECRET" not in m
+    assert "__APPVUE_KEY__" not in m
+    assert "__APPVUE_SECRET__" not in m
+    # Other application children remain intact.
+    assert "<application" in m and "</application>" in m
+
+
+def test_apply_flutter_appvue_disabled_strips_plist_entries(tmp_path):
+    _, plist = _seed_appvue_fixtures(tmp_path)
+    sdk_injector.apply_flutter(tmp_path, None, {})
+    p = plist.read_text(encoding="utf-8")
+    assert "AppVueKey" not in p
+    assert "AppVueSecret" not in p
+    assert "__APPVUE_KEY__" not in p
+    assert "__APPVUE_SECRET__" not in p
+    # Unrelated keys preserved.
+    assert "<key>CFBundleName</key>" in p
+    assert "<key>CFBundleVersion</key>" in p
+
+
+def test_apply_flutter_appvue_missing_native_files_is_safe(tmp_path):
+    # No manifest / plist on disk — injector must not crash on a non-AppVue,
+    # non-Android-shaped tmp dir (matches the simpler test_apply_flutter_* cases above).
+    sdk_injector.apply_flutter(
+        tmp_path,
+        None,
+        {"appvue": {"key": "K", "secret": "S"}},
+    )
+    # No assertion needed — call shouldn't raise.

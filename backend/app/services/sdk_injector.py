@@ -1,6 +1,9 @@
 """Inject SDK config + custom JS into a copied Flutter / Electron wrapper at build time."""
 from __future__ import annotations
 
+import base64
+import binascii
+import copy
 import json
 import os
 import re
@@ -12,6 +15,10 @@ from typing import Any
 SDK_CONFIG_GENERATED_DART = "lib/sdk_config.dart"
 ELECTRON_CUSTOM_JS_PLACEHOLDER = "__CUSTOM_JS__"
 ELECTRON_SDK_CONFIGS_PLACEHOLDER = "__SDK_CONFIGS__"
+
+
+class FirebaseInjectionError(ValueError):
+    """Raised when a Firebase config file cannot be decoded or is malformed."""
 
 # Match either placeholder, optionally surrounded by ' or " quotes.
 _ELECTRON_PLACEHOLDER_RE = re.compile(
@@ -26,12 +33,147 @@ def apply_flutter(
 ) -> None:
     """Generate lib/sdk_config.dart with the custom JS + SDK config payload.
 
+    Also materializes Firebase config files (google-services.json /
+    GoogleService-Info.plist) into the Flutter project tree when present;
+    those base64 blobs are stripped from the in-Dart sdkConfigsJson copy so
+    the generated constant stays small.
+
+    Also templates AppVue key/secret into AndroidManifest.xml and iOS
+    Info.plist (or removes the placeholder entries entirely when AppVue is
+    not enabled).
+
     The wrapper's main.dart reads from this file; missing values default to safe no-ops.
     """
     flutter_path = Path(flutter_dir)
+    sanitized_configs = _materialize_firebase_files(flutter_path, sdk_configs)
+    _apply_appvue_native(flutter_path, sdk_configs.get("appvue"))
     target = flutter_path / SDK_CONFIG_GENERATED_DART
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(_render_dart_config(custom_js, sdk_configs), encoding="utf-8")
+    target.write_text(
+        _render_dart_config(custom_js, sanitized_configs), encoding="utf-8"
+    )
+
+
+# Lines in AndroidManifest.xml that wrap the AppVue meta-data block. The
+# placeholders are emitted by the wrapper template; injector either fills them
+# in or deletes the surrounding <meta-data> element when AppVue is disabled.
+_APPVUE_MANIFEST_KEY_RE = re.compile(
+    r'[ \t]*<meta-data\s+android:name="com\.appvue\.sdk\.KEY"\s+'
+    r'android:value="__APPVUE_KEY__"\s*/>\s*\n?'
+)
+_APPVUE_MANIFEST_SECRET_RE = re.compile(
+    r'[ \t]*<meta-data\s+android:name="com\.appvue\.sdk\.SECRET"\s+'
+    r'android:value="__APPVUE_SECRET__"\s*/>\s*\n?'
+)
+
+# Lines in Runner/Info.plist that wrap the AppVue key+value pairs.
+_APPVUE_PLIST_KEY_RE = re.compile(
+    r'[ \t]*<key>AppVueKey</key>\s*\n[ \t]*<string>__APPVUE_KEY__</string>\s*\n?'
+)
+_APPVUE_PLIST_SECRET_RE = re.compile(
+    r'[ \t]*<key>AppVueSecret</key>\s*\n[ \t]*<string>__APPVUE_SECRET__</string>\s*\n?'
+)
+
+
+def _apply_appvue_native(
+    flutter_path: Path,
+    appvue_cfg: dict[str, Any] | None,
+) -> None:
+    """Fill in AppVue placeholders in Manifest + Info.plist, or strip them.
+
+    The wrapper ships with `__APPVUE_KEY__` / `__APPVUE_SECRET__` placeholders
+    so a non-AppVue build leaves no recognizable token in shipped binaries.
+    When the SDK is enabled we substitute the user's values; otherwise we
+    delete the entire <meta-data .../> element (Android) or <key>/<string>
+    pair (iOS) so the SDK's runtime lookup returns null and skips init.
+    """
+    manifest = flutter_path / "android/app/src/main/AndroidManifest.xml"
+    plist = flutter_path / "ios/Runner/Info.plist"
+
+    if appvue_cfg:
+        key = appvue_cfg.get("key", "")
+        secret = appvue_cfg.get("secret", "")
+        if manifest.exists():
+            text = manifest.read_text(encoding="utf-8")
+            text = text.replace("__APPVUE_KEY__", str(key))
+            text = text.replace("__APPVUE_SECRET__", str(secret))
+            manifest.write_text(text, encoding="utf-8")
+        if plist.exists():
+            text = plist.read_text(encoding="utf-8")
+            text = text.replace("__APPVUE_KEY__", str(key))
+            text = text.replace("__APPVUE_SECRET__", str(secret))
+            plist.write_text(text, encoding="utf-8")
+        return
+
+    # Disabled — strip placeholder entries entirely.
+    if manifest.exists():
+        text = manifest.read_text(encoding="utf-8")
+        text = _APPVUE_MANIFEST_KEY_RE.sub("", text)
+        text = _APPVUE_MANIFEST_SECRET_RE.sub("", text)
+        manifest.write_text(text, encoding="utf-8")
+    if plist.exists():
+        text = plist.read_text(encoding="utf-8")
+        text = _APPVUE_PLIST_KEY_RE.sub("", text)
+        text = _APPVUE_PLIST_SECRET_RE.sub("", text)
+        plist.write_text(text, encoding="utf-8")
+
+
+def _materialize_firebase_files(
+    flutter_path: Path,
+    sdk_configs: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Write Firebase google-services config files to the Flutter project.
+
+    Returns a deep copy of sdk_configs with the base64 fields stripped from
+    the firebase entry so they don't end up in the generated Dart constant.
+    If the firebase entry is absent or has no file payloads, the input is
+    returned unchanged (still as a deep copy for safety).
+    """
+    sanitized = copy.deepcopy(sdk_configs)
+    firebase_cfg = sanitized.get("firebase")
+    if not isinstance(firebase_cfg, dict):
+        return sanitized
+
+    android_b64 = firebase_cfg.get("androidGoogleServicesJson")
+    if isinstance(android_b64, str) and android_b64.strip():
+        raw = _decode_b64_field("androidGoogleServicesJson", android_b64)
+        try:
+            json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as e:
+            raise FirebaseInjectionError(
+                f"androidGoogleServicesJson is not valid UTF-8 JSON: {e}"
+            ) from e
+        dst = flutter_path / "android/app/google-services.json"
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        dst.write_bytes(raw)
+        firebase_cfg.pop("androidGoogleServicesJson", None)
+
+    ios_b64 = firebase_cfg.get("iosGoogleServiceInfoPlist")
+    if isinstance(ios_b64, str) and ios_b64.strip():
+        raw = _decode_b64_field("iosGoogleServiceInfoPlist", ios_b64)
+        # Plist is either XML (starts with <?xml or <!DOCTYPE plist) or binary
+        # (bplist00 magic). Reject anything else as obviously malformed.
+        head = raw[:8].lstrip()
+        if not (head.startswith(b"<?xml") or head.startswith(b"<!DOCT")
+                or raw.startswith(b"bplist")):
+            raise FirebaseInjectionError(
+                "iosGoogleServiceInfoPlist does not look like a plist (xml or bplist)"
+            )
+        dst = flutter_path / "ios/Runner/GoogleService-Info.plist"
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        dst.write_bytes(raw)
+        firebase_cfg.pop("iosGoogleServiceInfoPlist", None)
+
+    return sanitized
+
+
+def _decode_b64_field(field_name: str, value: str) -> bytes:
+    try:
+        return base64.b64decode(value, validate=True)
+    except (binascii.Error, ValueError) as e:
+        raise FirebaseInjectionError(
+            f"{field_name} is not valid base64: {e}"
+        ) from e
 
 
 def apply_electron(
