@@ -42,15 +42,20 @@ def apply_flutter(
     Info.plist (or removes the placeholder entries entirely when AppVue is
     not enabled).
 
+    If 51LA is enabled, prepends its JS bootstrap snippet to custom_js and
+    strips the la51 sub-object from sdkConfigsJson (already materialized
+    into the JS, no need to ship it twice).
+
     The wrapper's main.dart reads from this file; missing values default to safe no-ops.
     """
     flutter_path = Path(flutter_dir)
     sanitized_configs = _materialize_firebase_files(flutter_path, sdk_configs)
     _apply_appvue_native(flutter_path, sdk_configs.get("appvue"))
+    merged_custom_js = _prepend_la51_snippet(custom_js, sanitized_configs)
     target = flutter_path / SDK_CONFIG_GENERATED_DART
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(
-        _render_dart_config(custom_js, sanitized_configs), encoding="utf-8"
+        _render_dart_config(merged_custom_js, sanitized_configs), encoding="utf-8"
     )
 
 
@@ -160,6 +165,28 @@ def _render_la51_snippet(cfg: dict[str, Any]) -> str:
         "document.head.appendChild(s);"
         "})();"
     )
+
+
+def _prepend_la51_snippet(
+    custom_js: str | None,
+    sanitized_configs: dict[str, dict[str, Any]],
+) -> str | None:
+    """If 51LA is in sanitized_configs, render its boot snippet, prepend to
+    custom_js, and remove the la51 sub-object from sanitized_configs in
+    place. Returns the merged custom_js (or original if 51LA absent).
+
+    Caller owns sanitized_configs (typically a deepcopy from
+    _materialize_firebase_files) — we mutate it in place to avoid yet
+    another deepcopy.
+    """
+    la51_cfg = sanitized_configs.get("la51")
+    if not isinstance(la51_cfg, dict):
+        return custom_js
+    snippet = _render_la51_snippet(la51_cfg)
+    sanitized_configs.pop("la51", None)
+    if custom_js is None or custom_js == "":
+        return snippet
+    return snippet + "\n" + custom_js
 
 
 def _materialize_firebase_files(

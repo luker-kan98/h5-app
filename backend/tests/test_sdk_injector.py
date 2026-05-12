@@ -337,3 +337,44 @@ def test_render_la51_snippet_truthy_strings_normalize_to_bool():
     })
     assert "autoTrack:false" in snippet2
     assert "hashMode:false" in snippet2
+
+
+def test_apply_flutter_la51_injects_snippet(tmp_path):
+    sdk_injector.apply_flutter(
+        tmp_path,
+        None,
+        {"la51": {"maskId": "KrDopMys2nnwBDrx"}},
+    )
+    out = (tmp_path / "lib/sdk_config.dart").read_text(encoding="utf-8")
+    # customJs constant now carries the 51LA bootstrap, with all special chars
+    # Dart-escaped (single quotes are fine — Dart double-quoted strings allow
+    # raw single quotes).
+    assert "sdk.51.la/js-sdk-pro.min.js" in out
+    assert "id:'KrDopMys2nnwBDrx'" in out
+    # la51 sub-object is stripped from sdkConfigsJson to keep the constant small.
+    assert '\\"la51\\"' not in out
+    assert "KrDopMys2nnwBDrx" not in out.split('const String sdkConfigsJson')[1].split(';')[0]
+
+
+def test_apply_flutter_la51_prepends_before_user_customjs(tmp_path):
+    user_js = "window.MY_FLAG = 1;"
+    sdk_injector.apply_flutter(
+        tmp_path,
+        user_js,
+        {"la51": {"maskId": "Abc123"}},
+    )
+    out = (tmp_path / "lib/sdk_config.dart").read_text(encoding="utf-8")
+    # 51LA snippet must run before user customJs (so LA is initialized first).
+    la_pos = out.find("sdk.51.la")
+    user_pos = out.find("MY_FLAG")
+    assert la_pos != -1 and user_pos != -1
+    assert la_pos < user_pos
+
+
+def test_apply_flutter_la51_disabled_noop(tmp_path):
+    sdk_injector.apply_flutter(tmp_path, "var x = 1;", {})
+    out = (tmp_path / "lib/sdk_config.dart").read_text(encoding="utf-8")
+    assert "51.la" not in out
+    assert "LA.init" not in out
+    # User JS still flows through unchanged.
+    assert "var x = 1;" in out
