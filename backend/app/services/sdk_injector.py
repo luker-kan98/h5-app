@@ -121,11 +121,11 @@ def _apply_appvue_native(
 def _to_js_bool(value: Any) -> str:
     """Coerce a Python primitive into a JS boolean literal.
 
-    Mirrors the lenient parsing used by `_normalize_proxy.disableDirect`:
-    accepts True/False, 1/0, and the case-insensitive strings
-    "true"/"1"/"yes" / "false"/"0"/"no"/"". Anything else is treated as
-    falsy. Returns the literal string "true" or "false" — safe to embed
-    directly in rendered JS source.
+    Returns "true" if value is True, a non-zero number, or a string that —
+    after `.strip().lower()` — equals "true"/"1"/"yes". Everything else
+    (False, 0, "", "false", "no", unrecognized strings, None, lists, …)
+    returns "false". Output is always one of the two literal strings —
+    safe to embed directly in rendered JS source.
     """
     if isinstance(value, bool):
         return "true" if value else "false"
