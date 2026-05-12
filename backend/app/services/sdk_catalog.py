@@ -274,6 +274,8 @@ _DOMAIN_RE = re.compile(
     r"[a-zA-Z]{2,}$"
 )
 
+_LA51_MASKID_RE = re.compile(r"^[A-Za-z0-9]{1,32}$")
+
 
 def _split_lines(value: Any) -> list[str]:
     """Split a textarea value into trimmed non-empty lines.
@@ -400,6 +402,16 @@ def validate_sdk_configs(
                 f"SDK {sdk_id!r} does not support any of the selected platforms "
                 f"{sorted(requested)}; supported: {list(definition.supported_platforms)}"
             )
+
+        if sdk_id == "la51":
+            mask_id = fields_value.get("maskId")
+            if not isinstance(mask_id, str) or not _LA51_MASKID_RE.match(mask_id):
+                raise SdkValidationError(
+                    "51LA maskId must be 1–32 alphanumeric chars (got "
+                    f"{mask_id!r})"
+                )
+            # Fall through to generic field processing below for autoTrack /
+            # hashMode (booleans pass the (str, int, float, bool) check).
 
         if sdk_id == "proxy":
             cleaned[sdk_id] = _normalize_proxy(fields_value)

@@ -168,3 +168,48 @@ def test_rebuild_copies_sdk_config(client, auth_headers, db, tmp_path):
     new_sdk = db.query(BuildSdkConfig).filter(BuildSdkConfig.request_id == new_request.id).one()
     assert new_sdk.custom_js == "x()"
     assert json.loads(new_sdk.sdk_configs) == {"sentry": {"dsn": "https://x@y/1"}}
+
+
+# 51LA maskId validation tests
+import pytest
+
+from app.services.sdk_catalog import (
+    SdkValidationError,
+    validate_sdk_configs,
+)
+
+
+def test_validate_la51_maskid_required():
+    with pytest.raises(SdkValidationError, match="maskId"):
+        validate_sdk_configs({"la51": {}}, ["android"])
+
+
+def test_validate_la51_maskid_rejects_special_chars():
+    with pytest.raises(SdkValidationError, match="maskId"):
+        validate_sdk_configs(
+            {"la51": {"maskId": "abc';alert(1)"}}, ["android"]
+        )
+
+
+def test_validate_la51_maskid_rejects_too_long():
+    with pytest.raises(SdkValidationError, match="maskId"):
+        validate_sdk_configs(
+            {"la51": {"maskId": "a" * 33}}, ["android"]
+        )
+
+
+def test_validate_la51_maskid_accepts_real_sample():
+    cleaned = validate_sdk_configs(
+        {"la51": {"maskId": "KrDopMys2nnwBDrx"}},
+        ["android"],
+    )
+    assert cleaned["la51"]["maskId"] == "KrDopMys2nnwBDrx"
+
+
+def test_validate_la51_maskid_accepts_booleans():
+    cleaned = validate_sdk_configs(
+        {"la51": {"maskId": "KrDopMys2nnwBDrx", "autoTrack": True, "hashMode": False}},
+        ["android", "ios"],
+    )
+    assert cleaned["la51"]["autoTrack"] is True
+    assert cleaned["la51"]["hashMode"] is False
