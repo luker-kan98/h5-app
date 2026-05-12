@@ -1,8 +1,14 @@
 import io
 import json
+import pytest
 from unittest.mock import patch
 
 from PIL import Image
+
+from app.services.sdk_catalog import (
+    SdkValidationError,
+    validate_sdk_configs,
+)
 
 
 def _png_bytes(size=(1024, 1024)) -> io.BytesIO:
@@ -171,12 +177,6 @@ def test_rebuild_copies_sdk_config(client, auth_headers, db, tmp_path):
 
 
 # 51LA maskId validation tests
-import pytest
-
-from app.services.sdk_catalog import (
-    SdkValidationError,
-    validate_sdk_configs,
-)
 
 
 def test_validate_la51_maskid_required():
