@@ -34,8 +34,14 @@ def test_sdk_catalog_endpoint(client):
     body = resp.json()
     assert "sdks" in body
     ids = {s["id"] for s in body["sdks"]}
-    assert {"sentry", "umeng", "firebase", "appvue"} <= ids
+    assert {"sentry", "umeng", "firebase", "appvue", "la51"} <= ids
     assert "jpush" not in ids
+    # 51LA exposes a single required maskId field + two optional checkboxes.
+    la51 = next(s for s in body["sdks"] if s["id"] == "la51")
+    assert la51["category"] == "analytics"
+    assert set(la51["supported_platforms"]) == {"android", "ios", "macos", "windows"}
+    field_names = {f["name"] for f in la51["fields"]}
+    assert field_names == {"maskId", "autoTrack", "hashMode"}
 
 
 def _patches():

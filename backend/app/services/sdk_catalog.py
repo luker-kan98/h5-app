@@ -122,6 +122,35 @@ CATALOG: dict[str, SdkDefinition] = {
             ),
         ),
     ),
+    "la51": SdkDefinition(
+        id="la51",
+        name_en="51LA Analytics",
+        name_zh="51LA 网站统计",
+        category="analytics",
+        supported_platforms=("android", "ios", "macos", "windows"),
+        fields=(
+            SdkField(
+                name="maskId",
+                label_en="MaskId",
+                label_zh="应用 MaskId",
+                help_zh="(从 v6.51.la 应用管理页复制)",
+            ),
+            SdkField(
+                name="autoTrack",
+                label_en="Auto Event Tracking",
+                label_zh="启用事件分析",
+                required=False,
+                widget="checkbox",
+            ),
+            SdkField(
+                name="hashMode",
+                label_en="SPA Hash Routing",
+                label_zh="单页应用 Hash 路由统计",
+                required=False,
+                widget="checkbox",
+            ),
+        ),
+    ),
     "proxy": SdkDefinition(
         id="proxy",
         name_en="Network Proxy",
