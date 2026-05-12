@@ -51,7 +51,9 @@ def apply_flutter(
     flutter_path = Path(flutter_dir)
     sanitized_configs = _materialize_firebase_files(flutter_path, sdk_configs)
     _apply_appvue_native(flutter_path, sdk_configs.get("appvue"))
-    merged_custom_js = _prepend_la51_snippet(custom_js, sanitized_configs)
+    merged_custom_js = _materialize_la51_into_custom_js(
+        custom_js, sanitized_configs
+    )
     target = flutter_path / SDK_CONFIG_GENERATED_DART
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(
@@ -167,13 +169,18 @@ def _render_la51_snippet(cfg: dict[str, Any]) -> str:
     )
 
 
-def _prepend_la51_snippet(
+def _materialize_la51_into_custom_js(
     custom_js: str | None,
     sanitized_configs: dict[str, dict[str, Any]],
 ) -> str | None:
     """If 51LA is in sanitized_configs, render its boot snippet, prepend to
     custom_js, and remove the la51 sub-object from sanitized_configs in
     place. Returns the merged custom_js (or original if 51LA absent).
+
+    Two side-effects, both noted up front so this function's name reflects
+    what it does (mirrors `_materialize_firebase_files`):
+      1. Mutates `sanitized_configs` in place — pops the `la51` key.
+      2. Returns a merged string with the snippet prepended.
 
     Caller owns sanitized_configs (typically a deepcopy from
     _materialize_firebase_files) — we mutate it in place to avoid yet
