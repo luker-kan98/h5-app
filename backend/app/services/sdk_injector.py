@@ -151,7 +151,12 @@ def _render_la51_snippet(cfg: dict[str, Any]) -> str:
     by sdk_catalog.validate_sdk_configs, so we can safely embed it in single
     quotes without further escaping.
     """
-    mask_id = cfg["maskId"]
+    mask_id = cfg.get("maskId")
+    if not isinstance(mask_id, str) or not mask_id:
+        raise ValueError(
+            "_render_la51_snippet requires cfg['maskId']; got "
+            f"{mask_id!r}. Did the caller skip sdk_catalog.validate_sdk_configs?"
+        )
     auto_track = _to_js_bool(cfg.get("autoTrack"))
     hash_mode = _to_js_bool(cfg.get("hashMode"))
     return (

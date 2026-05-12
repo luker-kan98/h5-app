@@ -339,6 +339,18 @@ def test_render_la51_snippet_truthy_strings_normalize_to_bool():
     assert "hashMode:false" in snippet2
 
 
+def test_render_la51_snippet_missing_maskid_raises_helpful_error():
+    """Defends against callers that bypass sdk_catalog.validate_sdk_configs.
+    A bare KeyError would surface deep in the Celery worker traceback; the
+    explicit ValueError points back at the contract violation."""
+    with pytest.raises(ValueError, match="maskId"):
+        sdk_injector._render_la51_snippet({})
+    with pytest.raises(ValueError, match="maskId"):
+        sdk_injector._render_la51_snippet({"maskId": ""})
+    with pytest.raises(ValueError, match="maskId"):
+        sdk_injector._render_la51_snippet({"maskId": None})
+
+
 def test_apply_flutter_la51_injects_snippet(tmp_path):
     sdk_injector.apply_flutter(
         tmp_path,
