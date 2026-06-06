@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'appvue_plugin.dart';
 import 'proxy/domain_resolver.dart';
@@ -102,6 +103,17 @@ bool _hasAppVueConfig() {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // On Android 15+ (targetSdk 35+) apps are forced edge-to-edge: the WebView
+  // draws under the status bar and navigation bar. Make both system bars
+  // transparent with dark icons so the SafeArea gutters below blend with the
+  // app background and the bar icons stay legible over the H5 content.
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.dark,
+    statusBarBrightness: Brightness.light,
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarIconBrightness: Brightness.dark,
+  ));
   // Install the durable file logger BEFORE proxy boot so every line lands on
   // disk + the in-memory ring the error page renders.
   await ProxyFileLogger.instance.install();
@@ -285,7 +297,12 @@ class _WebViewPageState extends State<WebViewPage> {
 
   @override
   Widget build(BuildContext context) {
+    // The Scaffold background paints the status-bar / navigation-bar gutters
+    // that SafeArea reserves, so the H5 content never sits under the system
+    // bars (edge-to-edge on Android 15+). White matches the H5 page chrome;
+    // adjust here if the page uses a different background.
     return Scaffold(
+      backgroundColor: Colors.white,
       body: SafeArea(
         top: true,
         bottom: true,

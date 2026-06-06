@@ -34,6 +34,15 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- Disable Sentry's auto-init ContentProvider (SentryInitProvider).
+             It runs at process start — before Flutter/Dart — and calls
+             SentryAndroid.init with no DSN, throwing
+             "IllegalArgumentException: DSN is required" and killing the app
+             on launch (秒退/三退). Sentry is instead initialized manually from
+             MainActivity via the MethodChannel, only when a DSN is configured. -->
+        <meta-data
+            android:name="io.sentry.auto-init"
+            android:value="false" />
         <meta-data
             android:name="com.appvue.sdk.KEY"
             android:value="__APPVUE_KEY__" />
