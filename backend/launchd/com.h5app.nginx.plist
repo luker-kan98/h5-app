@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.h5app.nginx</string>
+  <key>UserName</key><string>ec2-user</string>
+  <key>GroupName</key><string>staff</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/nginx</string>
+    <string>-g</string>
+    <string>daemon off;</string>
+    <string>-c</string>
+    <string>/Users/ec2-user/h5-app/frontend/nginx.local.conf</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/tmp/h5-app-nginx-daemon.log</string>
+  <key>StandardErrorPath</key><string>/tmp/h5-app-nginx-daemon.log</string>
+</dict>
+</plist>

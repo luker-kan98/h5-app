@@ -4,7 +4,9 @@ cd /Users/ec2-user/h5-app/backend || exit 1
 
 export ENV_FILE="${ENV_FILE:-/Users/ec2-user/h5-app/backend/.env.production}"
 if [ -f "$ENV_FILE" ]; then
+  set -a
   source "$ENV_FILE"
+  set +a
 fi
 
 export PATH="/opt/homebrew/opt/python@3.12/libexec/bin:/opt/homebrew/opt/openjdk@17/bin:$PATH"

@@ -167,7 +167,7 @@ def test_submit_build_rejects_non_png_icon(client, auth_headers, tmp_path):
             headers=auth_headers,
         )
     assert resp.status_code == 422
-    assert resp.json()["detail"] == "Icon must be a PNG image"
+    assert resp.json()["detail"] == "图标必须是 PNG 格式"
 
 
 def test_submit_build_rejects_non_square_icon(client, auth_headers, tmp_path):
@@ -179,7 +179,7 @@ def test_submit_build_rejects_non_square_icon(client, auth_headers, tmp_path):
             headers=auth_headers,
         )
     assert resp.status_code == 422
-    assert resp.json()["detail"] == "Icon must be a square image"
+    assert resp.json()["detail"] == "图标必须是正方形"
 
 
 def test_submit_build_rejects_small_icon(client, auth_headers, tmp_path):
@@ -191,7 +191,7 @@ def test_submit_build_rejects_small_icon(client, auth_headers, tmp_path):
             headers=auth_headers,
         )
     assert resp.status_code == 422
-    assert resp.json()["detail"] == "Icon must be at least 1024x1024 pixels"
+    assert resp.json()["detail"] == "图标尺寸不得小于 1024x1024 像素"
 
 
 def test_submit_build_rejects_missing_android_package(client, auth_headers, tmp_path):
@@ -203,7 +203,7 @@ def test_submit_build_rejects_missing_android_package(client, auth_headers, tmp_
             headers=auth_headers,
         )
     assert resp.status_code == 422
-    assert resp.json()["detail"] == "Android package name is required when android is selected"
+    assert resp.json()["detail"] == "选择 Android 平台时必须提供包名"
 
 
 def test_submit_build_rejects_invalid_android_package(client, auth_headers, tmp_path):
@@ -215,7 +215,7 @@ def test_submit_build_rejects_invalid_android_package(client, auth_headers, tmp_
             headers=auth_headers,
         )
     assert resp.status_code == 422
-    assert resp.json()["detail"] == "Invalid Android package name"
+    assert resp.json()["detail"] == "无效的 Android 包名"
 
 
 def test_submit_build_rejects_localhost(client, auth_headers, tmp_path):
