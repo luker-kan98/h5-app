@@ -225,26 +225,32 @@ def _configure_ios_project(flutter_dir: str, app_name: str) -> None:
 
 def _rewrite_main_activity_package(flutter_dir: str, android_package_name: str) -> None:
     kotlin_root = Path(flutter_dir) / "android/app/src/main/kotlin"
-    current_path = next(kotlin_root.rglob("MainActivity.kt"), None)
-    if current_path is None:
+    kt_files = list(kotlin_root.rglob("*.kt"))
+    if not any(p.name == "MainActivity.kt" for p in kt_files):
         raise RuntimeError("Android MainActivity.kt not found")
 
-    activity_text = current_path.read_text(encoding="utf-8")
-    activity_text = re.sub(
-        r"^package\s+[^\n]+",
-        f"package {android_package_name}",
-        activity_text,
-        count=1,
-        flags=re.MULTILINE,
-    )
+    target_dir = kotlin_root / Path(android_package_name.replace(".", "/"))
+    target_dir.mkdir(parents=True, exist_ok=True)
 
-    target_path = kotlin_root / Path(android_package_name.replace(".", "/")) / "MainActivity.kt"
-    target_path.parent.mkdir(parents=True, exist_ok=True)
-    target_path.write_text(activity_text, encoding="utf-8")
+    source_dirs: set[Path] = set()
+    for current_path in kt_files:
+        text = current_path.read_text(encoding="utf-8")
+        text = re.sub(
+            r"^package\s+[^\n]+",
+            f"package {android_package_name}",
+            text,
+            count=1,
+            flags=re.MULTILINE,
+        )
+        target_path = target_dir / current_path.name
+        target_path.write_text(text, encoding="utf-8")
 
-    if current_path != target_path:
-        current_path.unlink()
-        _prune_empty_dirs(current_path.parent, kotlin_root)
+        if current_path != target_path:
+            source_dirs.add(current_path.parent)
+            current_path.unlink()
+
+    for source_dir in source_dirs:
+        _prune_empty_dirs(source_dir, kotlin_root)
 
 
 def _prune_empty_dirs(path: Path, stop_at: Path) -> None:

@@ -192,6 +192,54 @@ def test_configure_android_project_updates_label_and_package(tmp_path):
     assert not old_activity_path.exists()
 
 
+def test_configure_android_project_moves_sidecar_kotlin_sources(tmp_path):
+    from app.tasks.build_task import _configure_android_project
+
+    flutter_dir = tmp_path / "flutter"
+    kotlin_pkg_dir = (
+        flutter_dir / "android/app/src/main/kotlin/com/h5packager/h5_app"
+    )
+    manifest_path = flutter_dir / "android/app/src/main/AndroidManifest.xml"
+    gradle_path = flutter_dir / "android/app/build.gradle.kts"
+
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    gradle_path.parent.mkdir(parents=True, exist_ok=True)
+    kotlin_pkg_dir.mkdir(parents=True, exist_ok=True)
+
+    manifest_path.write_text(
+        '<application android:label="h5_app"></application>', encoding="utf-8"
+    )
+    gradle_path.write_text(
+        'android {\n    namespace = "com.h5packager.h5_app"\n    defaultConfig {\n'
+        '        applicationId = "com.h5packager.h5_app"\n    }\n}\n',
+        encoding="utf-8",
+    )
+    (kotlin_pkg_dir / "MainActivity.kt").write_text(
+        "package com.h5packager.h5_app\n\n"
+        "class MainActivity { fun f() { FirebaseBridgeHelper.init() } }\n",
+        encoding="utf-8",
+    )
+    (kotlin_pkg_dir / "FirebaseBridgeHelper.kt").write_text(
+        "package com.h5packager.h5_app\n\nobject FirebaseBridgeHelper\n",
+        encoding="utf-8",
+    )
+    (kotlin_pkg_dir / "ProxyControllerPlugin.kt").write_text(
+        "package com.h5packager.h5_app\n\nclass ProxyControllerPlugin\n",
+        encoding="utf-8",
+    )
+
+    _configure_android_project(str(flutter_dir), "Example App", "com.example.app")
+
+    new_pkg_dir = flutter_dir / "android/app/src/main/kotlin/com/example/app"
+    for name in ("MainActivity.kt", "FirebaseBridgeHelper.kt", "ProxyControllerPlugin.kt"):
+        moved = new_pkg_dir / name
+        assert moved.exists(), f"{name} was not moved to new package dir"
+        assert "package com.example.app" in moved.read_text(encoding="utf-8")
+
+    # Old package directory must be fully cleaned up.
+    assert not kotlin_pkg_dir.exists()
+
+
 def test_configure_ios_project_updates_bundle_names(tmp_path):
     from app.tasks.build_task import _configure_ios_project
 
