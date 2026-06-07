@@ -137,7 +137,7 @@ def _prepare_electron(
         json.dump(package_data, f, ensure_ascii=False, indent=2)
         f.write("\n")
 
-    _run(["npm", "install"], cwd=electron_dir)
+    _run(["npm", "ci", "--prefer-offline", "--no-audit", "--no-fund"], cwd=electron_dir)
     return electron_dir
 
 

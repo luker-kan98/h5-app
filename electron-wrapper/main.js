@@ -106,6 +106,9 @@ function createWindow() {
   mainWin = new BrowserWindow({
     width: 1280,
     height: 800,
+    // Hide the menu bar on Windows/Linux by default (Alt still reveals it).
+    // DevTools stays reachable via Ctrl+Shift+I / Cmd+Alt+I (menu + global shortcut).
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -113,9 +116,11 @@ function createWindow() {
     },
   });
 
-  // Auto-open DevTools so the user can see network errors immediately.
-  // (Cmd+Opt+I / Ctrl+Shift+I also toggle it via the application menu below.)
-  mainWin.webContents.openDevTools({ mode: 'detach' });
+  // Make sure the menu bar is hidden on non-mac platforms; macOS keeps its
+  // top-of-screen app menu (which cannot be hidden and is expected there).
+  if (process.platform !== 'darwin') {
+    mainWin.setMenuBarVisibility(false);
+  }
 
   mainWin.webContents.on('did-finish-load', () => {
     console.log('[webview] did-finish-load url=%s', mainWin.webContents.getURL());
