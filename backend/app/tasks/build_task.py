@@ -12,6 +12,7 @@ from typing import Optional
 
 from celery import Celery
 from celery.exceptions import SoftTimeLimitExceeded
+from celery.signals import worker_process_init
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
@@ -32,6 +33,26 @@ from app.services import sdk_injector
 
 celery_app = Celery("h5packager")
 celery_app.config_from_object("celeryconfig")
+
+
+@worker_process_init.connect
+def _renew_db_connections_after_fork(**_kwargs):
+    """Give every forked worker its own database connections.
+
+    Celery's prefork pool forks workers from a parent process that has already
+    opened SQLAlchemy/psycopg connections (e.g. the import-time schema check
+    below). The children inherit those TCP sockets, and two workers reading the
+    same connection concurrently corrupts the PostgreSQL wire protocol -- which
+    surfaces as ``ResourceClosedError`` ("does not return rows") or a stray
+    ``IndexError`` on the very first query, and can leave tasks wedged in
+    ``running``. Disposing the inherited pool forces each worker to open fresh
+    connections; ``close=False`` abandons the sockets without closing them out
+    from under the parent process.
+    """
+    from app.database import engine
+
+    engine.dispose(close=False)
+
 
 REPO_ROOT = os.getenv("REPO_ROOT", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
 FLUTTER_WRAPPER_SRC = os.path.join(REPO_ROOT, "flutter-wrapper")
@@ -76,12 +97,29 @@ def _build_android(h5_url: str, flutter_dir: str, keystore_params: Optional[dict
     return os.path.join(flutter_dir, "build/app/outputs/flutter-apk/app-release.apk")
 
 
+_COCOAPODS_STALE_MARKERS = ("out-of-date", "pod repo update")
+
+
+def _is_cocoapods_stale_error(message: str) -> bool:
+    """True when a build failure is CocoaPods complaining about a stale specs repo."""
+    lowered = message.lower()
+    return "cocoapods" in lowered and any(marker in lowered for marker in _COCOAPODS_STALE_MARKERS)
+
+
 def _build_ios(h5_url: str, flutter_dir: str) -> str:
-    _run(
-        ["flutter", "build", "ios", "--release", "--no-codesign",
-         f"--dart-define=H5_URL={h5_url}"],
-        cwd=flutter_dir,
-    )
+    build_cmd = [
+        "flutter", "build", "ios", "--release", "--no-codesign",
+        f"--dart-define=H5_URL={h5_url}",
+    ]
+    try:
+        _run(build_cmd, cwd=flutter_dir)
+    except RuntimeError as exc:
+        if not _is_cocoapods_stale_error(str(exc)):
+            raise
+        # The local CocoaPods specs repo is "too out-of-date to satisfy
+        # dependencies". Refresh it once, then retry the build.
+        _run(["pod", "repo", "update"], cwd=os.path.join(flutter_dir, "ios"))
+        _run(build_cmd, cwd=flutter_dir)
     return os.path.join(flutter_dir, "build/ios/iphoneos/Runner.app")
 
 
@@ -277,16 +315,16 @@ PLATFORM_PATH_ATTRS = {p: f"{p}_path" for p in PLATFORM_BUILDERS}
 PLATFORM_ERROR_ATTRS = {p: f"{p}_error" for p in PLATFORM_BUILDERS}
 
 
-def _mark_request_inputs_complete_if_finished(db: Session, request: BuildRequest) -> None:
-    remaining = (
-        db.query(BuildTask)
-        .filter(
-            BuildTask.request_id == request.id,
-            BuildTask.status.notin_(["done", "failed", "cancelled"]),
-        )
-        .count()
-    )
-    if remaining:
+def _cleanup_request_inputs_if_succeeded(db: Session, request: BuildRequest) -> None:
+    """Delete a request's persisted build inputs (icon + keystore) once it is done.
+
+    Inputs are removed only when *every* task succeeded. If any task failed (or is
+    still running) the icon and keystore are kept on disk so the request can be
+    retried via ``/rebuild`` without the user re-uploading them. The files live
+    until the build record is deleted, which clears them in ``delete_build``.
+    """
+    tasks = db.query(BuildTask).filter(BuildTask.request_id == request.id).all()
+    if not tasks or any(task.status != "done" for task in tasks):
         return
 
     cleanup_dirs = set()
@@ -416,6 +454,11 @@ def execute_build_task(self, build_task_id: int):
         refresh_request_status(db, request.id)
 
     except SoftTimeLimitExceeded:
+        # The soft-time-limit signal can fire mid-DB-statement, leaving the
+        # session's transaction in a failed state. Roll back before reusing it,
+        # otherwise the failure-recording queries below raise PendingRollbackError
+        # (seen in the wild as "expected to update 1 row(s); N were matched").
+        db.rollback()
         task = db.query(BuildTask).filter(BuildTask.id == build_task_id).one()
         request = db.query(BuildRequest).filter(BuildRequest.id == task.request_id).one()
         task.status = "failed"
@@ -425,6 +468,9 @@ def execute_build_task(self, build_task_id: int):
         db.commit()
         refresh_request_status(db, request.id)
     except Exception as e:
+        # Reset any partially-failed transaction before recording the failure, so
+        # the status write runs on a clean session/connection.
+        db.rollback()
         task = db.query(BuildTask).filter(BuildTask.id == build_task_id).one()
         request = db.query(BuildRequest).filter(BuildRequest.id == task.request_id).one()
         task.status = "failed"
@@ -436,11 +482,17 @@ def execute_build_task(self, build_task_id: int):
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
         try:
+            # If an exception handler left the session in a failed-transaction
+            # state, clear it so the best-effort cleanup below can run.
+            db.rollback()
             task = db.query(BuildTask).filter(BuildTask.id == build_task_id).one_or_none()
             if task is not None:
                 request = db.query(BuildRequest).filter(BuildRequest.id == task.request_id).one_or_none()
                 if request is not None:
-                    _mark_request_inputs_complete_if_finished(db, request)
+                    _cleanup_request_inputs_if_succeeded(db, request)
                     run_scheduler_once(db)
+        except Exception:
+            # Cleanup/scheduling is best-effort; never let it mask the build result.
+            db.rollback()
         finally:
             db.close()

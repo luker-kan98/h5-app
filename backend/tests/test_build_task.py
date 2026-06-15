@@ -113,6 +113,66 @@ def test_build_ios_returns_runner_app_path():
     assert result == "/tmp/flutter/build/ios/iphoneos/Runner.app"
 
 
+_COCOAPODS_STALE_ERROR = (
+    "Command flutter failed:\n"
+    "stderr:\n"
+    "[!] CocoaPods's specs repository is too out-of-date to satisfy dependencies.\n"
+    "To update the CocoaPods specs, run:\n"
+    "  pod repo update\n"
+)
+
+
+def test_build_ios_refreshes_stale_cocoapods_repo_and_retries():
+    """A stale CocoaPods specs repo triggers `pod repo update`, then a rebuild."""
+    from app.tasks.build_task import _build_ios
+
+    calls = []
+    flutter_attempts = {"n": 0}
+
+    def fake_run(cmd, cwd=None, env=None):
+        calls.append((cmd, cwd))
+        if cmd[0] == "flutter":
+            flutter_attempts["n"] += 1
+            if flutter_attempts["n"] == 1:
+                raise RuntimeError(_COCOAPODS_STALE_ERROR)
+
+    with patch("app.tasks.build_task._run", side_effect=fake_run):
+        result = _build_ios("https://example.com", "/tmp/flutter")
+
+    assert [cmd[0] for cmd, _ in calls] == ["flutter", "pod", "flutter"]
+    assert calls[1] == (["pod", "repo", "update"], "/tmp/flutter/ios")
+    assert result == "/tmp/flutter/build/ios/iphoneos/Runner.app"
+
+
+def test_build_ios_does_not_retry_unrelated_errors():
+    from app.tasks.build_task import _build_ios
+
+    with patch(
+        "app.tasks.build_task._run",
+        side_effect=RuntimeError("Command flutter failed:\nstderr:\nSwift compile error"),
+    ) as mock_run:
+        with pytest.raises(RuntimeError, match="compile error"):
+            _build_ios("https://example.com", "/tmp/flutter")
+
+    # No `pod repo update`, no retry -- only the single failed build attempt.
+    assert mock_run.call_count == 1
+
+
+@pytest.mark.parametrize(
+    "message, expected",
+    [
+        (_COCOAPODS_STALE_ERROR, True),
+        ("CocoaPods could not satisfy dependencies; run pod repo update", True),
+        ("Command flutter failed: Swift compile error", False),
+        ("npm ERR! out-of-date lockfile", False),
+    ],
+)
+def test_is_cocoapods_stale_error(message, expected):
+    from app.tasks.build_task import _is_cocoapods_stale_error
+
+    assert _is_cocoapods_stale_error(message) is expected
+
+
 # ---------------------------------------------------------------------------
 # _build_macos (Electron)
 # ---------------------------------------------------------------------------
@@ -381,3 +441,254 @@ def test_execute_build_task_uploads_artifact_to_s3_and_persists_url(db, tmp_path
     assert refreshed.artifact_s3_key == "uploads/request-s3-1/android.apk"
     assert refreshed.artifact_url == "https://macosbuckets3.s3.ap-east-1.amazonaws.com/uploads/request-s3-1/android.apk"
     mock_upload.assert_called_once_with(str(output_path), "request-s3-1", "android.apk")
+
+
+def test_execute_build_task_marks_failed_and_preserves_inputs_for_retry(db, tmp_path):
+    """Mimics the real build failures (npm/CocoaPods blowing up): the task ends up
+    `failed` with a message, and the persisted icon survives so the request can be
+    retried via /rebuild without the user re-uploading anything.
+    """
+    from app.models.build_request import BuildRequest
+    from app.models.build_task import BuildTask
+
+    # A persisted build input that MUST outlive a failed build.
+    icon_dir = tmp_path / "icon-fail"
+    icon_dir.mkdir()
+    icon_path = icon_dir / "app-icon.png"
+    icon_path.write_bytes(b"png")
+
+    request = BuildRequest(
+        request_id="request-fail-1",
+        h5_url="https://example.com",
+        app_name="Fail App",
+        requested_platforms=json.dumps(["android"]),
+        status="queued",
+        android_package_name="com.example.app",
+        icon_path=str(icon_path),
+    )
+    db.add(request)
+    db.commit()
+    db.refresh(request)
+
+    task = BuildTask(
+        task_id="task-fail-1",
+        request_id=request.id,
+        platform="android",
+        status="queued",
+        resource_profile="android",
+    )
+    db.add(task)
+    db.commit()
+
+    worker_tmp = tmp_path / "worker-tmp"
+    worker_tmp.mkdir()
+
+    engine = db.get_bind()
+    SessionFactory = sessionmaker(bind=engine)
+
+    failing_builder = MagicMock(
+        side_effect=RuntimeError("Command npm failed:\nstderr:\nelectron-builder cannot find wine")
+    )
+
+    with patch("app.tasks.build_task._get_db", side_effect=lambda: SessionFactory()), \
+         patch("app.tasks.build_task.PLATFORM_BUILDERS", {"android": failing_builder}), \
+         patch("app.tasks.build_task.shutil.copytree"), \
+         patch("app.tasks.build_task._prepare_flutter_workspace"), \
+         patch("app.tasks.build_task._run"), \
+         patch("app.tasks.build_task.tempfile.mkdtemp", return_value=str(worker_tmp)), \
+         patch("app.tasks.build_task.run_scheduler_once"), \
+         patch("app.tasks.build_task.refresh_request_status"), \
+         patch("app.tasks.build_task.artifact_dir", return_value=str(tmp_path / request.request_id)):
+        from app.tasks.build_task import execute_build_task
+        execute_build_task.run(task.id)
+
+    check_session = SessionFactory()
+    try:
+        refreshed = check_session.query(BuildTask).filter(BuildTask.id == task.id).one()
+    finally:
+        check_session.close()
+
+    assert refreshed.status == "failed"
+    assert refreshed.failure_code == "build_failed"
+    assert "npm failed" in refreshed.failure_message
+    assert refreshed.finished_at is not None
+    failing_builder.assert_called_once()
+    # The icon input survives the failure -> retry/rebuild stays possible.
+    assert icon_path.exists()
+
+
+def test_execute_build_task_records_failure_even_when_session_transaction_poisoned(db, tmp_path):
+    """Regression: a build can fail *after* its DB transaction is already in a
+    failed state -- e.g. the Celery soft-time-limit signal interrupts a statement
+    mid-flight. The except handler must roll back before recording the failure,
+    otherwise the status write dies with PendingRollbackError (seen in the wild as
+    "expected to update 1 row(s); N were matched") and the task is never marked
+    failed -- which is why some failures showed up in the logs but never in the DB.
+    """
+    from app.models.build_request import BuildRequest
+    from app.models.build_task import BuildTask
+
+    request = BuildRequest(
+        request_id="request-poison-1",
+        h5_url="https://example.com",
+        app_name="Poison App",
+        requested_platforms=json.dumps(["android"]),
+        status="queued",
+        android_package_name="com.example.app",
+    )
+    db.add(request)
+    db.commit()
+    db.refresh(request)
+
+    task = BuildTask(
+        task_id="task-poison-1",
+        request_id=request.id,
+        platform="android",
+        status="queued",
+        resource_profile="android",
+    )
+    db.add(task)
+    db.commit()
+
+    worker_tmp = tmp_path / "worker-tmp"
+    worker_tmp.mkdir()
+
+    engine = db.get_bind()
+    SessionFactory = sessionmaker(bind=engine)
+    task_sessions = []
+
+    def make_session():
+        session = SessionFactory()
+        task_sessions.append(session)
+        return session
+
+    def poison_then_fail(*_args, **_kwargs):
+        # Leave the task's own session in a failed-flush state -- the same state
+        # production hit when a flush raised mid-build (StaleDataError). A unique
+        # constraint violation on flush marks the session "rollback pending" so any
+        # further use raises PendingRollbackError until rollback() is called.
+        session = task_sessions[0]
+        session.add(BuildTask(
+            task_id="task-poison-1",  # duplicate of the existing task_id
+            request_id=request.id,
+            platform="android",
+            status="queued",
+            resource_profile="android",
+        ))
+        try:
+            session.flush()
+        except Exception:
+            pass  # session now requires rollback before any further use
+        raise RuntimeError("Command flutter failed:\nstderr:\ninterrupted mid-build")
+
+    with patch("app.tasks.build_task._get_db", side_effect=make_session), \
+         patch("app.tasks.build_task.PLATFORM_BUILDERS", {"android": poison_then_fail}), \
+         patch("app.tasks.build_task.shutil.copytree"), \
+         patch("app.tasks.build_task._prepare_flutter_workspace"), \
+         patch("app.tasks.build_task._run"), \
+         patch("app.tasks.build_task.tempfile.mkdtemp", return_value=str(worker_tmp)), \
+         patch("app.tasks.build_task.run_scheduler_once"), \
+         patch("app.tasks.build_task.refresh_request_status"), \
+         patch("app.tasks.build_task.artifact_dir", return_value=str(tmp_path / request.request_id)):
+        from app.tasks.build_task import execute_build_task
+        # Must not raise: the failure has to be recorded cleanly, not crash the task.
+        execute_build_task.run(task.id)
+
+    check_session = SessionFactory()
+    try:
+        refreshed = check_session.query(BuildTask).filter(BuildTask.id == task.id).one()
+    finally:
+        check_session.close()
+
+    assert refreshed.status == "failed"
+    assert refreshed.failure_code == "build_failed"
+    assert refreshed.finished_at is not None
+
+
+# ---------------------------------------------------------------------------
+# worker fork handling
+# ---------------------------------------------------------------------------
+
+def test_worker_process_init_disposes_inherited_pool():
+    """Forked workers must drop the connection pool inherited from the parent so
+    they don't share Postgres sockets (corruption -> ResourceClosedError)."""
+    from app.tasks.build_task import _renew_db_connections_after_fork
+
+    with patch("app.database.engine") as mock_engine:
+        _renew_db_connections_after_fork()
+
+    mock_engine.dispose.assert_called_once_with(close=False)
+
+
+# ---------------------------------------------------------------------------
+# input persistence for retry
+# ---------------------------------------------------------------------------
+
+def _make_request_with_inputs(db, tmp_path, request_id, platforms):
+    from app.models.build_request import BuildRequest
+
+    icon_dir = tmp_path / f"icon-{request_id}"
+    icon_dir.mkdir()
+    icon_path = icon_dir / "app-icon.png"
+    icon_path.write_bytes(b"png")
+
+    request = BuildRequest(
+        request_id=request_id,
+        h5_url=f"https://{request_id}.example.com",
+        app_name=f"App {request_id}",
+        requested_platforms=json.dumps(platforms),
+        status="submitted",
+        icon_path=str(icon_path),
+    )
+    db.add(request)
+    db.commit()
+    db.refresh(request)
+    return request, icon_path
+
+
+def _add_tasks(db, request, statuses):
+    from app.models.build_task import BuildTask
+
+    for platform, status in statuses.items():
+        db.add(BuildTask(
+            task_id=f"{request.request_id}-{platform}",
+            request_id=request.id,
+            platform=platform,
+            status=status,
+            resource_profile=platform,
+        ))
+    db.commit()
+
+
+def test_inputs_preserved_when_a_task_failed(db, tmp_path):
+    """A failed build keeps its icon/keystore on disk so it can be retried."""
+    from app.tasks.build_task import _cleanup_request_inputs_if_succeeded
+
+    request, icon_path = _make_request_with_inputs(db, tmp_path, "keep", ["android", "ios"])
+    _add_tasks(db, request, {"android": "done", "ios": "failed"})
+
+    _cleanup_request_inputs_if_succeeded(db, request)
+
+    assert icon_path.exists()
+
+
+def test_inputs_preserved_while_still_running(db, tmp_path):
+    from app.tasks.build_task import _cleanup_request_inputs_if_succeeded
+
+    request, icon_path = _make_request_with_inputs(db, tmp_path, "running", ["android", "ios"])
+    _add_tasks(db, request, {"android": "done", "ios": "running"})
+
+    _cleanup_request_inputs_if_succeeded(db, request)
+
+    assert icon_path.exists()
+
+
+def test_inputs_removed_when_all_tasks_succeeded(db, tmp_path):
+    from app.tasks.build_task import _cleanup_request_inputs_if_succeeded
+
+    request, icon_path = _make_request_with_inputs(db, tmp_path, "ok", ["android", "ios"])
+    _add_tasks(db, request, {"android": "done", "ios": "done"})
+
+    _cleanup_request_inputs_if_succeeded(db, request)
+
+    assert not icon_path.exists()
