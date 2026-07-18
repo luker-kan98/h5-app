@@ -70,5 +70,9 @@ export function useBuild() {
     }
   }
 
-  return { loading, error, submitBuild, getStatus, getHistory, rebuildBuild }
+  async function deleteBuild(requestId: string): Promise<void> {
+    await client.delete(`/build/${requestId}`)
+  }
+
+  return { loading, error, submitBuild, getStatus, getHistory, rebuildBuild, deleteBuild }
 }

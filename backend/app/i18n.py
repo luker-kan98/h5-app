@@ -65,6 +65,11 @@ MESSAGES: dict[str, dict[str, str]] = {
         "zh-CN": "未找到构建任务",
         "zh": "未找到构建任务",
     },
+    "cannot_delete_running": {
+        "en": "Cannot delete a build that is still in progress",
+        "zh-CN": "无法删除正在进行中的构建",
+        "zh": "无法删除正在进行中的构建",
+    },
     "file_not_found": {
         "en": "File not found",
         "zh-CN": "文件未找到",

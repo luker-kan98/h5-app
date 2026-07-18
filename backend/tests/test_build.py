@@ -459,3 +459,93 @@ def test_submit_build_rejects_duplicate_package_name(client, auth_headers, tmp_p
         )
     assert resp2.status_code == 409
     assert "包名已被使用" in resp2.json()["detail"]
+
+
+def test_delete_build_removes_request_and_tasks(client, auth_headers, tmp_path, db):
+    from app.models.build_request import BuildRequest
+    from app.models.build_task import BuildTask
+
+    with patch("app.api.build.BUILDS_DIR", str(tmp_path)), \
+         patch("app.api.build.run_scheduler_once", return_value={"promoted": 0, "dispatched": 0}), \
+         patch("app.api.build.refresh_request_status", return_value="submitted"), \
+         patch("app.api.build.estimate_request_wait_seconds", return_value=0):
+        resp = client.post(
+            "/build",
+            data=_build_form_data(h5_url="https://delete-me.example.com"),
+            files=_build_files(),
+            headers=auth_headers,
+        )
+    assert resp.status_code == 200
+    request_id = resp.json()["request_id"]
+
+    request = db.query(BuildRequest).filter(BuildRequest.request_id == request_id).one()
+    request.status = "done"
+    db.commit()
+
+    with patch("app.api.build.BUILDS_DIR", str(tmp_path)):
+        del_resp = client.delete(f"/build/{request_id}", headers=auth_headers)
+    assert del_resp.status_code == 200
+    assert del_resp.json()["deleted"] == request_id
+
+    assert db.query(BuildRequest).filter(BuildRequest.request_id == request_id).first() is None
+    assert db.query(BuildTask).filter(BuildTask.request_id == request.id).count() == 0
+
+
+def test_delete_build_rejects_in_progress(client, auth_headers, tmp_path, db):
+    from app.models.build_request import BuildRequest
+
+    with patch("app.api.build.BUILDS_DIR", str(tmp_path)), \
+         patch("app.api.build.run_scheduler_once", return_value={"promoted": 0, "dispatched": 0}), \
+         patch("app.api.build.refresh_request_status", return_value="running"), \
+         patch("app.api.build.estimate_request_wait_seconds", return_value=0):
+        resp = client.post(
+            "/build",
+            data=_build_form_data(h5_url="https://running.example.com"),
+            files=_build_files(),
+            headers=auth_headers,
+        )
+    assert resp.status_code == 200
+    request_id = resp.json()["request_id"]
+
+    request = db.query(BuildRequest).filter(BuildRequest.request_id == request_id).one()
+    request.status = "running"
+    db.commit()
+
+    del_resp = client.delete(f"/build/{request_id}", headers=auth_headers)
+    assert del_resp.status_code == 409
+
+
+def test_delete_build_not_found(client, auth_headers):
+    resp = client.delete("/build/nonexistent-id", headers=auth_headers)
+    assert resp.status_code == 404
+
+
+def test_failed_build_keeps_inputs_and_delete_clears_them(client, auth_headers, tmp_path, db):
+    from app.models.build_request import BuildRequest
+
+    with patch("app.api.build.BUILDS_DIR", str(tmp_path)), \
+         patch("app.api.build.run_scheduler_once", return_value={"promoted": 0, "dispatched": 0}), \
+         patch("app.api.build.refresh_request_status", return_value="submitted"), \
+         patch("app.api.build.estimate_request_wait_seconds", return_value=0):
+        resp = client.post(
+            "/build",
+            data=_build_form_data(h5_url="https://retry-inputs.example.com"),
+            files=_build_files(),
+            headers=auth_headers,
+        )
+    assert resp.status_code == 200
+    request_id = resp.json()["request_id"]
+
+    request = db.query(BuildRequest).filter(BuildRequest.request_id == request_id).one()
+    icon_dir = tmp_path / f"icon-{request.id}"
+    # The uploaded icon is persisted so a failed build can be retried.
+    assert icon_dir.is_dir()
+
+    request.status = "failed"
+    db.commit()
+
+    with patch("app.api.build.BUILDS_DIR", str(tmp_path)):
+        del_resp = client.delete(f"/build/{request_id}", headers=auth_headers)
+    assert del_resp.status_code == 200
+    # Deleting the record clears the persisted inputs.
+    assert not icon_dir.exists()

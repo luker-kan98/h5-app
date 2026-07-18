@@ -27,6 +27,12 @@
               :disabled="rebuildingId === (item.request_id || item.task_id)">
               重新打包
             </button>
+            <button
+              @click.prevent="handleDelete(item)"
+              class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-500 hover:bg-gray-200 disabled:opacity-50"
+              :disabled="deletingId === (item.request_id || item.task_id)">
+              删除
+            </button>
           </div>
         </div>
       </div>
@@ -41,9 +47,24 @@ import { useRouter } from 'vue-router'
 import { useBuild } from '@/composables/useBuild'
 
 const router = useRouter()
-const { getHistory, rebuildBuild } = useBuild()
+const { getHistory, rebuildBuild, deleteBuild } = useBuild()
 const items = ref<any[]>([])
 const rebuildingId = ref<string | null>(null)
+const deletingId = ref<string | null>(null)
+
+async function handleDelete(item: any) {
+  const id = item.request_id || item.task_id
+  if (!confirm('确定删除该打包记录吗？此操作不可恢复。')) return
+  deletingId.value = id
+  try {
+    await deleteBuild(id)
+    items.value = items.value.filter((i) => (i.request_id || i.task_id) !== id)
+  } catch (e: any) {
+    alert(e?.response?.data?.detail ?? '删除失败')
+  } finally {
+    deletingId.value = null
+  }
+}
 
 async function handleRebuild(item: any) {
   const id = item.request_id || item.task_id
