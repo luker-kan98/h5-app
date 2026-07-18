@@ -34,9 +34,8 @@ target 'Runner' do
   pod 'AppVueSDK', :path => '.'
   pod 'Sentry', '~> 8.36'
   pod 'UMCommon', '~> 7.6.2'
+  # UMCommon leaves UMDevice unconstrained; pin the verified compatible line.
   pod 'UMDevice', '~> 2.2.0'
-  pod 'UMAPM', '~> 1.6.0'
-  pod 'UMCCommonLog', '~> 1.0.0'
 
   # Firebase pods are installed only when the packager has injected
   # GoogleService-Info.plist into Runner/. Skipping them keeps non-Firebase

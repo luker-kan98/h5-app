@@ -123,9 +123,15 @@ def test_ios_template_declares_buildable_umeng_and_firebase_sources():
     project_file = (ios_dir / "Runner.xcodeproj/project.pbxproj").read_text(encoding="utf-8")
 
     assert "pod 'UMCommon', '~> 7.6.2'" in podfile
+    assert "pod 'UMDevice', '~> 2.2.0'" in podfile
     assert "UMCommon (7.6.2)" in podfile_lock
-    # UMAPM 1.6.x is a binary framework without a Swift module map. It must be
-    # linked by CocoaPods, but importing it directly makes Swift compilation fail.
+    assert "UMDevice (2.2.1)" in podfile_lock
+    # Analytics uses UMCommon/MobClick only. The unused UMAPM binary is hosted
+    # separately and can make otherwise valid builds fail during download.
+    assert "pod 'UMAPM'" not in podfile
+    assert "UMAPM (" not in podfile_lock
+    assert "pod 'UMCCommonLog'" not in podfile
+    # UMAPM 1.6.x has no Swift module map and must never be imported directly.
     assert "import UMAPM" not in app_delegate
     # The helper existed on disk but was previously absent from the Runner target.
     assert "FirebaseBridgeHelper.swift in Sources" in project_file

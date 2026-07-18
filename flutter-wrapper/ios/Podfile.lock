@@ -4,8 +4,6 @@ PODS:
   - Sentry (8.58.4):
     - Sentry/Core (= 8.58.4)
   - Sentry/Core (8.58.4)
-  - UMAPM (1.6.5)
-  - UMCCommonLog (1.0.0)
   - UMCommon (7.6.2):
     - UMDevice
   - UMDevice (2.2.1)
@@ -17,8 +15,6 @@ DEPENDENCIES:
   - AppVueSDK (from `.`)
   - Flutter (from `Flutter`)
   - Sentry (~> 8.36)
-  - UMAPM (~> 1.6.0)
-  - UMCCommonLog (~> 1.0.0)
   - UMCommon (~> 7.6.2)
   - UMDevice (~> 2.2.0)
   - webview_flutter_wkwebview (from `.symlinks/plugins/webview_flutter_wkwebview/darwin`)
@@ -26,8 +22,6 @@ DEPENDENCIES:
 SPEC REPOS:
   trunk:
     - Sentry
-    - UMAPM
-    - UMCCommonLog
     - UMCommon
     - UMDevice
 
@@ -43,12 +37,10 @@ SPEC CHECKSUMS:
   AppVueSDK: c332713ce4640b01db6d33f5a7609f4bce0e3550
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   Sentry: 5321d74bdd28d6f6f8beaa1ca06f1fdc746bff49
-  UMAPM: d9b9ae7f6aa01ba707455da2d85f0e22f76aaec6
-  UMCCommonLog: 05a2d5de21858e3d870551562cff405c1366d244
   UMCommon: e0e973ab5cf413e2d9f854ee78689a1945252540
   UMDevice: 053478c4b4d7292f31f0a275c227d3c4007a5571
   webview_flutter_wkwebview: 1821ceac936eba6f7984d89a9f3bcb4dea99ebb2
 
-PODFILE CHECKSUM: 7bc72615b6f37432b05803b9d69a1d64b5504252
+PODFILE CHECKSUM: e108d3234513d95989bcb4d38d0bc4c6522db34e
 
 COCOAPODS: 1.16.2
