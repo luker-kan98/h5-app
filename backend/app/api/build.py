@@ -32,6 +32,16 @@ from app.services.sdk_catalog import (
 from app.services.url_validator import validate_h5_url, UrlValidationError
 
 VALID_PLATFORMS = {"android", "ios", "macos", "windows"}
+NON_TERMINAL_BUILD_STATUSES = {
+    "submitted",
+    "waiting_capacity",
+    "queued",
+    "running",
+    "uploading",
+    # Legacy statuses kept for old BuildJob rows.
+    "pending",
+    "building",
+}
 BUILDS_DIR = os.getenv("BUILDS_DIR", "./builds")
 ANDROID_PACKAGE_RE = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$")
 
@@ -277,6 +287,87 @@ def rebuild(
         queue_state=new_request.status,
         estimated_wait_seconds=estimate,
     )
+
+
+@router.delete("/build/{request_id}")
+def delete_build(
+    request_id: str,
+    language: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    build_request = db.query(BuildRequest).filter(
+        BuildRequest.request_id == request_id,
+    ).first()
+    if build_request:
+        if build_request.status in NON_TERMINAL_BUILD_STATUSES:
+            raise HTTPException(status_code=409, detail=t("cannot_delete_running", language))
+
+        tasks = db.query(BuildTask).filter(BuildTask.request_id == build_request.id).all()
+        _cleanup_artifacts(task.artifact_path for task in tasks)
+        _cleanup_request_inputs(db, build_request)
+        db.query(BuildTask).filter(
+            BuildTask.request_id == build_request.id,
+        ).delete(synchronize_session=False)
+        db.query(BuildSdkConfig).filter(
+            BuildSdkConfig.request_id == build_request.id,
+        ).delete(synchronize_session=False)
+        db.flush()
+        db.delete(build_request)
+        db.commit()
+        _cleanup_build_dir(request_id)
+        return {"deleted": request_id}
+
+    job = db.query(BuildJob).filter(BuildJob.task_id == request_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail=t("build_request_not_found", language))
+    if job.status in NON_TERMINAL_BUILD_STATUSES:
+        raise HTTPException(status_code=409, detail=t("cannot_delete_running", language))
+    _cleanup_artifacts(
+        [job.android_path, job.ios_path, job.macos_path, job.windows_path]
+    )
+    db.delete(job)
+    db.commit()
+    _cleanup_build_dir(request_id)
+    return {"deleted": request_id}
+
+
+def _cleanup_request_inputs(db: Session, build_request: BuildRequest) -> None:
+    """Remove a request's persisted icon/keystore input directories.
+
+    These inputs are kept on disk for failed requests so they can be retried; once
+    the build record is deleted they are no longer needed. A path is skipped when
+    another request still references the same file -- ``/rebuild`` reuses the
+    original's icon/keystore, so deleting the source would break the retry.
+    """
+    import shutil
+
+    for path in (build_request.icon_path, build_request.keystore_path):
+        if not path:
+            continue
+        still_referenced = db.query(BuildRequest).filter(
+            BuildRequest.id != build_request.id,
+            (BuildRequest.icon_path == path) | (BuildRequest.keystore_path == path),
+        ).first()
+        if still_referenced:
+            continue
+        shutil.rmtree(os.path.dirname(path), ignore_errors=True)
+
+
+def _cleanup_artifacts(paths) -> None:
+    for path in paths:
+        if path and os.path.isfile(path):
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+
+
+def _cleanup_build_dir(request_id: str) -> None:
+    build_dir = os.path.join(BUILDS_DIR, request_id)
+    if os.path.isdir(build_dir):
+        import shutil
+
+        shutil.rmtree(build_dir, ignore_errors=True)
 
 
 @router.get("/build/{task_id}", response_model=BuildStatusResponse)
