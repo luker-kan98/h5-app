@@ -92,7 +92,7 @@ def build_request_to_status_response(
     elif all(task.status == "done" for task in tasks):
         queue_state = "done"
     elif tasks and all(task.status in {"done", "failed", "cancelled"} for task in tasks):
-        queue_state = "failed" if all(task.status == "failed" for task in tasks) else "done"
+        queue_state = "failed" if any(task.status == "failed" for task in tasks) else "done"
 
     return {
         "task_id": request.request_id,

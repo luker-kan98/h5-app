@@ -33,7 +33,7 @@ target 'Runner' do
 
   pod 'AppVueSDK', :path => '.'
   pod 'Sentry', '~> 8.36'
-  pod 'UMCommon', '~> 7.6.0'
+  pod 'UMCommon', '~> 7.6.2'
   pod 'UMDevice', '~> 2.2.0'
   pod 'UMAPM', '~> 1.6.0'
   pod 'UMCCommonLog', '~> 1.0.0'

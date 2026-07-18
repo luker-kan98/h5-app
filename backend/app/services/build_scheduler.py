@@ -100,11 +100,8 @@ def refresh_request_status(db: Session, request_id: int) -> str:
         request.status = "waiting_capacity"
     elif any(task.status == "submitted" for task in tasks):
         request.status = "submitted"
-    elif all(task.status == "failed" for task in tasks):
-        request.status = "failed"
-        request.finished_at = datetime.now(timezone.utc)
     elif all(task.status in TERMINAL_STATUSES for task in tasks):
-        request.status = "done"
+        request.status = "failed" if any(task.status == "failed" for task in tasks) else "done"
         request.finished_at = datetime.now(timezone.utc)
     else:
         request.status = "submitted"

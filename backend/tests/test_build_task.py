@@ -113,6 +113,24 @@ def test_build_ios_returns_runner_app_path():
     assert result == "/tmp/flutter/build/ios/iphoneos/Runner.app"
 
 
+def test_ios_template_declares_buildable_umeng_and_firebase_sources():
+    repo_root = Path(__file__).resolve().parents[2]
+    ios_dir = repo_root / "flutter-wrapper/ios"
+
+    podfile = (ios_dir / "Podfile").read_text(encoding="utf-8")
+    podfile_lock = (ios_dir / "Podfile.lock").read_text(encoding="utf-8")
+    app_delegate = (ios_dir / "Runner/AppDelegate.swift").read_text(encoding="utf-8")
+    project_file = (ios_dir / "Runner.xcodeproj/project.pbxproj").read_text(encoding="utf-8")
+
+    assert "pod 'UMCommon', '~> 7.6.2'" in podfile
+    assert "UMCommon (7.6.2)" in podfile_lock
+    # UMAPM 1.6.x is a binary framework without a Swift module map. It must be
+    # linked by CocoaPods, but importing it directly makes Swift compilation fail.
+    assert "import UMAPM" not in app_delegate
+    # The helper existed on disk but was previously absent from the Runner target.
+    assert "FirebaseBridgeHelper.swift in Sources" in project_file
+
+
 _COCOAPODS_STALE_ERROR = (
     "Command flutter failed:\n"
     "stderr:\n"

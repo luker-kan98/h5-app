@@ -92,3 +92,47 @@ def test_scheduler_leaves_task_waiting_when_memory_is_high(db):
     assert result == {"promoted": 1, "dispatched": 0}
     assert task.status == "waiting_capacity"
     mock_apply_async.assert_not_called()
+
+
+def test_refresh_request_status_marks_partial_platform_failure_failed(db):
+    from app.models.build_request import BuildRequest
+    from app.models.build_task import BuildTask
+    from app.services.build_scheduler import refresh_request_status
+
+    request = BuildRequest(
+        request_id="request-partial-failure",
+        h5_url="https://partial-failure.example.com",
+        app_name="Partial Failure App",
+        requested_platforms='["android", "ios"]',
+        status="running",
+    )
+    db.add(request)
+    db.commit()
+    db.refresh(request)
+
+    db.add_all([
+        BuildTask(
+            task_id="task-partial-android",
+            request_id=request.id,
+            platform="android",
+            status="done",
+            priority=0,
+            resource_profile="android",
+        ),
+        BuildTask(
+            task_id="task-partial-ios",
+            request_id=request.id,
+            platform="ios",
+            status="failed",
+            priority=0,
+            resource_profile="ios",
+            failure_code="build_failed",
+            failure_message="CocoaPods could not resolve UMCommon",
+        ),
+    ])
+    db.commit()
+
+    assert refresh_request_status(db, request.id) == "failed"
+    db.refresh(request)
+    assert request.status == "failed"
+    assert request.finished_at is not None

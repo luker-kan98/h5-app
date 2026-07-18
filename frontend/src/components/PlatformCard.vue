@@ -1,9 +1,12 @@
 <template>
   <div class="border rounded-lg p-4 flex items-center justify-between">
-    <div>
+    <div class="min-w-0 flex-1 mr-3">
       <p class="font-medium text-sm">{{ label }}</p>
       <p class="text-xs mt-0.5" :class="statusColor">{{ statusText }}</p>
-      <p v-if="platform.error" class="text-xs text-red-500 mt-1 max-w-xs truncate">{{ platform.error }}</p>
+      <details v-if="platform.error" class="mt-2 text-xs text-red-600">
+        <summary class="cursor-pointer select-none">失败原因</summary>
+        <pre class="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-red-50 p-2 font-mono text-[11px] leading-4">{{ platform.error }}</pre>
+      </details>
     </div>
     <button v-if="platform.download_url" @click="handleDownload"
       :disabled="downloading"

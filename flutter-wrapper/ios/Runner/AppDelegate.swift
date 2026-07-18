@@ -3,7 +3,6 @@ import UIKit
 import AppVueSDK
 import Sentry
 import UMCommon
-import UMAPM
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {

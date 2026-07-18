@@ -280,6 +280,58 @@ def test_get_build_status_returns_s3_download_url(client, auth_headers, db):
     )
 
 
+def test_get_build_status_returns_partial_failure_message(client, auth_headers, db):
+    from app.models.build_request import BuildRequest
+    from app.models.build_task import BuildTask
+
+    request = BuildRequest(
+        request_id="request-partial-status",
+        h5_url="https://partial-status.example.com",
+        app_name="Partial Status App",
+        requested_platforms=json.dumps(["android", "ios"]),
+        status="running",
+        android_package_name="com.example.partial",
+    )
+    db.add(request)
+    db.commit()
+    db.refresh(request)
+
+    db.add_all([
+        BuildTask(
+            task_id="task-partial-status-android",
+            request_id=request.id,
+            platform="android",
+            status="done",
+            resource_profile="android",
+            artifact_path="/tmp/request-partial-status/android.apk",
+        ),
+        BuildTask(
+            task_id="task-partial-status-ios",
+            request_id=request.id,
+            platform="ios",
+            status="failed",
+            resource_profile="ios",
+            failure_code="build_failed",
+            failure_message="CocoaPods could not resolve UMCommon 7.6.2",
+        ),
+    ])
+    db.commit()
+
+    with patch("app.api.build.estimate_request_wait_seconds", return_value=0):
+        resp = client.get("/build/request-partial-status", headers=auth_headers)
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "failed"
+    assert body["queue_state"] == "failed"
+    assert body["platforms"]["android"]["status"] == "done"
+    assert body["platforms"]["ios"] == {
+        "status": "failed",
+        "download_url": None,
+        "error": "CocoaPods could not resolve UMCommon 7.6.2",
+    }
+
+
 def test_download_file_redirects_to_s3_url(client, auth_headers, db):
     from app.models.build_request import BuildRequest
     from app.models.build_task import BuildTask
