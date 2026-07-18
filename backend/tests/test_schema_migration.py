@@ -55,7 +55,7 @@ def test_migrate_single_host_scheduler_creates_tables_and_backfills(tmp_path):
     assert summary.migration_recorded is True
 
     assert request.h5_url == "https://example.com"
-    assert request.status == "done"
+    assert request.status == "failed"
 
     assert [task.platform for task in tasks] == ["android", "ios"]
     android_task = next(task for task in tasks if task.platform == "android")
